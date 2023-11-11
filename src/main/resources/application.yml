@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: urlshortener-payment-service
+  profiles:
+    active: dev
+
+  h2:
+    console:
+      enabled: true
+
+  datasource:
+    url: jdbc:h2:file:/data/paymentservice
+    username: sa
+    password: password
+    driver-class-name: org.h2.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+#eureka:
+#  client:
+#    service-url:
+#      defaultZone: http://localhost:8761/eureka/
+
+stripe:
+  api:
+    key: sk_test_51NMY71SFuq306rp4be4Wg7teWekKXcotgwJxx2nv5EHnBAXOlXpWJ3ICHECNYrTeyTHalHt9DAPmLRY3Qz5BwvMc00icN5fN2b
+
