@@ -1,5 +1,6 @@
-package com.akgarg.paymentservice.database;
+package com.akgarg.paymentservice.db;
 
+import com.akgarg.paymentservice.exception.DatabaseException;
 import com.akgarg.paymentservice.payment.PaymentDetail;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -15,8 +16,7 @@ import java.util.Optional;
 @Service
 @Profile("prod")
 public class MySQLDatabaseService implements DatabaseService {
-
-
+    
     @Override
     public boolean savePaymentDetails(final PaymentDetail paymentDetail) throws DatabaseException {
         return false;

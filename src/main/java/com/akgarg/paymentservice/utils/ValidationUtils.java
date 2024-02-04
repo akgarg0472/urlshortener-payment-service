@@ -2,7 +2,10 @@ package com.akgarg.paymentservice.utils;
 
 import com.akgarg.paymentservice.exception.PaymentException;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
+import org.springframework.http.HttpStatus;
 import org.springframework.validation.BindingResult;
+
+import java.util.Collection;
 
 /**
  * @author Akhilesh Garg
@@ -16,12 +19,11 @@ public final class ValidationUtils {
 
     public static void checkAndThrowValidationException(final BindingResult bindingResult) {
         if (bindingResult.hasFieldErrors()) {
-            final String[] errors = bindingResult.getFieldErrors()
+            final Collection<String> errors = bindingResult.getFieldErrors()
                     .stream()
                     .map(DefaultMessageSourceResolvable::getDefaultMessage)
-                    .toList()
-                    .toArray(String[]::new);
-            throw new PaymentException(400, errors, "Validation failed");
+                    .toList();
+            throw new PaymentException(HttpStatus.BAD_REQUEST.value(), errors, "Validation failed");
         }
     }
 

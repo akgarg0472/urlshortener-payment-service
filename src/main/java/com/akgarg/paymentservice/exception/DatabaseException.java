@@ -1,4 +1,4 @@
-package com.akgarg.paymentservice.database;
+package com.akgarg.paymentservice.exception;
 
 /**
  * @author Akhilesh Garg

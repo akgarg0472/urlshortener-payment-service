@@ -1,47 +1,59 @@
 package com.akgarg.paymentservice.exception;
 
-import com.akgarg.paymentservice.response.PaymentFailureResponse;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+import java.util.Collection;
+import java.util.List;
 
 /**
  * Advice class to handle all exceptions thrown by the application
- * and return {@link PaymentFailureResponse} as response back to the client.
  *
  * @author Akhilesh Garg
  * @since 11/11/23
  */
 @RestControllerAdvice
-public class GlobalExceptionHandler {
+class GlobalExceptionHandler {
 
     @ExceptionHandler(PaymentException.class)
-    public ResponseEntity<PaymentFailureResponse> handlePaymentException(final PaymentException paymentException) {
-        return ResponseEntity.status(paymentException.getStatusCode())
-                .body(new PaymentFailureResponse(
-                              paymentException.getStatusCode(),
-                              paymentException.getMessage(),
-                              paymentException.getErrors()
-                      )
-                );
+    public ResponseEntity<ApiErrorResponse> handlePaymentException(final PaymentException paymentException) {
+        return ResponseEntity
+                .status(paymentException.statusCode())
+                .body(new ApiErrorResponse(
+                        paymentException.statusCode(),
+                        paymentException.getMessage(),
+                        paymentException.errors()
+                ));
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<PaymentFailureResponse> handleException(final Exception exception) {
+    public ResponseEntity<ApiErrorResponse> handleException(final Exception exception) {
         exception.printStackTrace();
 
-        final PaymentFailureResponse paymentFailureResponse = switch (exception.getClass().getSimpleName()) {
-            case "HttpRequestMethodNotSupportedException" ->
-                    new PaymentFailureResponse(405, "Method not allowed", null);
-            case "HttpMediaTypeNotSupportedException" ->
-                    new PaymentFailureResponse(400, "Media type is not supported", null);
+        final ApiErrorResponse paymentFailureResponse = switch (exception.getClass().getSimpleName()) {
+            case "HttpRequestMethodNotSupportedException" -> new ApiErrorResponse(405, "Method not allowed", null);
+            case "HttpMediaTypeNotSupportedException" -> new ApiErrorResponse(400, "Media type is not supported", null);
             case "HttpMessageNotReadableException" ->
-                    new PaymentFailureResponse(400, "Please provide valid payment params", null);
-            default -> new PaymentFailureResponse(500, "Internal server error", null);
+                    new ApiErrorResponse(400, "Please provide valid payment params", null);
+            case "NoResourceFoundException" -> new ApiErrorResponse(
+                    404,
+                    "Not Found",
+                    List.of("Requested resource not found: " + ((NoResourceFoundException) exception).getResourcePath())
+            );
+            default -> new ApiErrorResponse(500, "Internal server error", null);
         };
 
-        return ResponseEntity.status(paymentFailureResponse.statusCode())
-                .body(paymentFailureResponse);
+        return ResponseEntity.status(paymentFailureResponse.statusCode()).body(paymentFailureResponse);
+    }
+
+    record ApiErrorResponse(
+            @JsonIgnore int statusCode,
+            String message,
+            Collection<String> errors
+    ) {
     }
 
 }

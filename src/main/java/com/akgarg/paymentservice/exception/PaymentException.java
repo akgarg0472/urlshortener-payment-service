@@ -2,6 +2,8 @@ package com.akgarg.paymentservice.exception;
 
 import jakarta.annotation.Nullable;
 
+import java.util.Collection;
+
 /**
  * @author Akhilesh Garg
  * @since 11/11/23
@@ -9,21 +11,24 @@ import jakarta.annotation.Nullable;
 public class PaymentException extends RuntimeException {
 
     private final int statusCode;
+    private final Collection<String> errors;
 
-    @Nullable
-    private final String[] errors;
-
-    public PaymentException(final int statusCode, @Nullable final String[] errors, final String message) {
+    public PaymentException(
+            final int statusCode,
+            @Nullable final Collection<String> errors,
+            final String message
+    ) {
         super(message);
         this.errors = errors;
         this.statusCode = statusCode;
     }
 
-    public int getStatusCode() {
+    public int statusCode() {
         return statusCode;
     }
 
-    public String[] getErrors() {
+    @Nullable
+    public Collection<String> errors() {
         return errors;
     }
 

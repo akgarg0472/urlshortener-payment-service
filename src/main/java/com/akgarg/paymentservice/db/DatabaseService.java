@@ -1,5 +1,6 @@
-package com.akgarg.paymentservice.database;
+package com.akgarg.paymentservice.db;
 
+import com.akgarg.paymentservice.exception.DatabaseException;
 import com.akgarg.paymentservice.payment.PaymentDetail;
 
 import java.util.List;
