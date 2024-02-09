@@ -1,10 +1,17 @@
-package com.akgarg.paymentservice.paypal;
+package com.akgarg.paymentservice.v1.paypal;
 
 import com.akgarg.paymentservice.db.DatabaseService;
 import com.akgarg.paymentservice.exception.DatabaseException;
 import com.akgarg.paymentservice.exception.PaymentException;
 import com.akgarg.paymentservice.payment.PaymentDetail;
+import com.akgarg.paymentservice.payment.PaymentService;
 import com.akgarg.paymentservice.payment.PaymentStatus;
+import com.akgarg.paymentservice.request.CompletePaymentRequest;
+import com.akgarg.paymentservice.request.CreatePaymentRequest;
+import com.akgarg.paymentservice.request.VerifyPaymentRequest;
+import com.akgarg.paymentservice.response.CompletePaymentResponse;
+import com.akgarg.paymentservice.response.CreatePaymentResponse;
+import com.akgarg.paymentservice.response.VerifyPaymentResponse;
 import com.paypal.core.PayPalHttpClient;
 import com.paypal.http.HttpResponse;
 import com.paypal.orders.*;
@@ -20,7 +27,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 
 @Service
-class PaypalService {
+public class PaypalService implements PaymentService {
 
     private static final Logger LOG = LogManager.getLogger(PaypalService.class);
     private static final String PAYMENT_GATEWAY_NAME = "Paypal";
@@ -39,15 +46,15 @@ class PaypalService {
         this.uiCancelUrl = Objects.requireNonNull(dotenv.get("PAYPAL_FRONTEND_CANCEL_URL"), "Paypal UI cancel URL not found in env");
     }
 
-    public CreatePaymentResponse createPayment(final CreatePaymentRequest paymentRequest) {
-        final String traceId = paymentRequest.userId() + "-" + System.currentTimeMillis();
+    public CreatePaymentResponse createPayment(final CreatePaymentRequest createPaymentRequest) {
+        final String traceId = createPaymentRequest.userId() + "-" + System.currentTimeMillis();
 
-        LOG.info("{} create payment received for amount={}", traceId, paymentRequest.amount());
+        LOG.info("{} create payment received for amount={}", traceId, createPaymentRequest.amount());
 
         final var orderRequest = new OrderRequest();
         orderRequest.checkoutPaymentIntent("CAPTURE");
 
-        final var amountBreakdown = new AmountWithBreakdown().currencyCode(paymentRequest.currency()).value(String.valueOf(paymentRequest.amount()));
+        final var amountBreakdown = new AmountWithBreakdown().currencyCode(createPaymentRequest.currency()).value(String.valueOf(createPaymentRequest.amount()));
 
         final var purchaseUnitRequest = new PurchaseUnitRequest().amountWithBreakdown(amountBreakdown);
         orderRequest.purchaseUnits(List.of(purchaseUnitRequest));
@@ -72,11 +79,11 @@ class PaypalService {
             final PaymentDetail paymentDetail = new PaymentDetail(
                     traceId,
                     orderId,
-                    paymentRequest.userId(),
-                    paymentRequest.amount(),
+                    createPaymentRequest.userId(),
+                    createPaymentRequest.amount(),
                     PaymentStatus.CREATED,
-                    paymentRequest.currency(),
-                    paymentRequest.paymentMethod(),
+                    createPaymentRequest.currency(),
+                    createPaymentRequest.paymentMethod(),
                     Instant.now(),
                     null,
                     PAYMENT_GATEWAY_NAME
@@ -148,6 +155,17 @@ class PaypalService {
 
             throw new PaymentException(HttpStatus.INTERNAL_SERVER_ERROR.value(), null, "Internal Server Error");
         }
+    }
+
+    @Override
+    public VerifyPaymentResponse verifyPayment(final VerifyPaymentRequest verifyPaymentRequest) {
+        // TODO implement
+        return null;
+    }
+
+    @Override
+    public String getPaymentGatewayServiceName() {
+        return PAYMENT_GATEWAY_NAME;
     }
 
 }
