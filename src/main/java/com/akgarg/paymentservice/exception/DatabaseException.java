@@ -6,8 +6,15 @@ package com.akgarg.paymentservice.exception;
  */
 public class DatabaseException extends RuntimeException {
 
-    public DatabaseException(final String message) {
+    private final int errorStatusCode;
+
+    public DatabaseException(final String message, final int errorStatusCode) {
         super(message);
+        this.errorStatusCode = errorStatusCode;
+    }
+
+    public int errorStatusCode() {
+        return errorStatusCode;
     }
 
 }

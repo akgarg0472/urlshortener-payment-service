@@ -3,6 +3,7 @@ package com.akgarg.paymentservice.db;
 import com.akgarg.paymentservice.exception.DatabaseException;
 import com.akgarg.paymentservice.payment.PaymentDetail;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -27,7 +28,10 @@ public class InMemoryDatabaseService implements DatabaseService {
     @Override
     public boolean savePaymentDetails(final PaymentDetail paymentDetail) throws DatabaseException {
         if (paymentDetails.containsKey(paymentDetail.getPaymentId())) {
-            throw new DatabaseException("Payment details already exists");
+            throw new DatabaseException(
+                    "Payment details already exists",
+                    HttpStatus.CONFLICT.value()
+            );
         }
 
         paymentDetails.put(paymentDetail.getPaymentId(), paymentDetail);
@@ -37,7 +41,10 @@ public class InMemoryDatabaseService implements DatabaseService {
     @Override
     public boolean updatePaymentDetails(final PaymentDetail paymentDetail) throws DatabaseException {
         if (!paymentDetails.containsKey(paymentDetail.getPaymentId())) {
-            throw new DatabaseException("Payment details not found with id: " + paymentDetail.getPaymentId());
+            throw new DatabaseException(
+                    "Payment details not found with id: " + paymentDetail.getPaymentId(),
+                    HttpStatus.NOT_FOUND.value()
+            );
         }
 
         paymentDetails.put(paymentDetail.getPaymentId(), paymentDetail);
@@ -61,7 +68,10 @@ public class InMemoryDatabaseService implements DatabaseService {
     @Override
     public boolean deletePaymentDetails(final String paymentId) throws DatabaseException {
         if (!paymentDetails.containsKey(paymentId)) {
-            throw new DatabaseException("Payment details not found with id: " + paymentId);
+            throw new DatabaseException(
+                    "Payment details not found with id: " + paymentId,
+                    HttpStatus.NOT_FOUND.value()
+            );
         }
 
         return paymentDetails.remove(paymentId) != null;

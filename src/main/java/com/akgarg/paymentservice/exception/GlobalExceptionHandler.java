@@ -19,17 +19,6 @@ import java.util.List;
 @RestControllerAdvice
 class GlobalExceptionHandler {
 
-    @ExceptionHandler(PaymentException.class)
-    public ResponseEntity<ApiErrorResponse> handlePaymentException(final PaymentException paymentException) {
-        return ResponseEntity
-                .status(paymentException.statusCode())
-                .body(new ApiErrorResponse(
-                        paymentException.statusCode(),
-                        paymentException.getMessage(),
-                        paymentException.errors()
-                ));
-    }
-
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<ApiErrorResponse> handleBadRequestException(final BadRequestException badRequestException) {
         return ResponseEntity
@@ -38,6 +27,28 @@ class GlobalExceptionHandler {
                         HttpStatus.BAD_REQUEST.value(),
                         "Bad Request",
                         badRequestException.errors()
+                ));
+    }
+
+    @ExceptionHandler(DatabaseException.class)
+    public ResponseEntity<ApiErrorResponse> handleDatabaseException(final DatabaseException databaseException) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new ApiErrorResponse(
+                        databaseException.errorStatusCode(),
+                        databaseException.getMessage(),
+                        null
+                ));
+    }
+
+    @ExceptionHandler(PaymentException.class)
+    public ResponseEntity<ApiErrorResponse> handlePaymentException(final PaymentException paymentException) {
+        return ResponseEntity
+                .status(paymentException.statusCode())
+                .body(new ApiErrorResponse(
+                        paymentException.statusCode(),
+                        paymentException.getMessage(),
+                        paymentException.errors()
                 ));
     }
 

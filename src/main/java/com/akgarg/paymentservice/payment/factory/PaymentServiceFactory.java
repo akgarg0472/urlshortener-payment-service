@@ -1,6 +1,6 @@
 package com.akgarg.paymentservice.payment.factory;
 
-import com.akgarg.paymentservice.payment.PaymentService;
+import com.akgarg.paymentservice.payment.service.PaymentService;
 import org.springframework.stereotype.Component;
 
 import java.util.Collection;
@@ -17,7 +17,7 @@ public class PaymentServiceFactory {
     public PaymentServiceFactory(final Collection<PaymentService> services) {
         this.paymentServices = services.stream()
                 .collect(Collectors.toMap(
-                        PaymentService::getPaymentGatewayServiceName,
+                        PaymentService::getPaymentGatewayName,
                         Function.identity()
                 ));
     }
