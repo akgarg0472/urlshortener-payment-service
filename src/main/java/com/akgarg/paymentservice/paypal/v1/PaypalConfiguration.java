@@ -1,4 +1,4 @@
-package com.akgarg.paymentservice.v1.paypal;
+package com.akgarg.paymentservice.paypal.v1;
 
 import com.paypal.core.PayPalEnvironment;
 import com.paypal.core.PayPalHttpClient;

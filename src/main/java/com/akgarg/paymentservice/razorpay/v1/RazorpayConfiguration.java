@@ -1,4 +1,4 @@
-package com.akgarg.paymentservice.v1.razorpay;
+package com.akgarg.paymentservice.razorpay.v1;
 
 import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;

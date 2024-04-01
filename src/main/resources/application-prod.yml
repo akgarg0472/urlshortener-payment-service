@@ -1,0 +1,31 @@
+spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+  datasource:
+    url: jdbc:mysql://localhost:3306/urlshortener_payment?serverTimezone=UTC&createDatabaseIfNotExist=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: PaymentServiceConnectionPool
+      maximum-pool-size: 20
+      minimum-idle: 5
+  jpa:
+    hibernate:
+      ddl-auto: update
+    generate-ddl: true
+    open-in-view: false
+    show-sql: false
+
+kafka:
+  payment:
+    topic:
+      name: urlshortener-payment-events
+      partitions: 1
+      replication-factor: 1
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    enabled: true

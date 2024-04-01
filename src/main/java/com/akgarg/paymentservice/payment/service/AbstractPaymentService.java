@@ -1,6 +1,8 @@
 package com.akgarg.paymentservice.payment.service;
 
 import com.akgarg.paymentservice.db.DatabaseService;
+import com.akgarg.paymentservice.eventpublisher.PaymentEvent;
+import com.akgarg.paymentservice.eventpublisher.PaymentEventPublisher;
 import com.akgarg.paymentservice.exception.DatabaseException;
 import com.akgarg.paymentservice.exception.PaymentException;
 import com.akgarg.paymentservice.payment.PaymentDetail;
@@ -11,7 +13,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.http.HttpStatus;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 
@@ -19,35 +20,32 @@ public abstract class AbstractPaymentService implements PaymentService {
 
     private static final Logger LOG = LogManager.getLogger(AbstractPaymentService.class);
     private final DatabaseService databaseService;
+    private final PaymentEventPublisher paymentEventPublisher;
 
-    protected AbstractPaymentService(@Nonnull final DatabaseService databaseService) {
+    protected AbstractPaymentService(
+            @Nonnull final DatabaseService databaseService,
+            @Nonnull final PaymentEventPublisher paymentEventPublisher
+    ) {
         this.databaseService = Objects.requireNonNull(databaseService, "Database service is null");
+        this.paymentEventPublisher = Objects.requireNonNull(paymentEventPublisher, "Payment event publisher is null");
     }
 
     protected void savePaymentInDatabase(
             @Nonnull final CreatePaymentRequest createPaymentRequest,
             @Nonnull final String traceId,
-            @Nonnull final String orderId,
+            @Nonnull final String paymentId,
             @Nonnull final String paymentGatewayName
     ) throws DatabaseException {
-        final PaymentDetail paymentDetail = new PaymentDetail(
-                traceId,
-                orderId,
-                createPaymentRequest.userId(),
-                createPaymentRequest.amount(),
-                PaymentStatus.CREATED,
-                createPaymentRequest.currency(),
-                createPaymentRequest.paymentMethod(),
-                Instant.now(),
-                null,
-                paymentGatewayName
-        );
+        final PaymentDetail paymentDetail = PaymentDetailsMapper.from(createPaymentRequest);
+        paymentDetail.setTraceId(traceId);
+        paymentDetail.setPaymentId(paymentId);
+        paymentDetail.setPaymentGateway(paymentGatewayName);
 
         LOG.debug("{} Payment details: {}", traceId, paymentDetail);
 
         final boolean isPaymentSaved = this.databaseService.savePaymentDetails(paymentDetail);
 
-        LOG.info("{} result of payment create with order id={} -> {}", traceId, orderId, isPaymentSaved);
+        LOG.info("{} result of payment create with order id={} -> {}", traceId, paymentId, isPaymentSaved);
     }
 
     protected PaymentDetail getPaymentDetailByPaymentId(@Nonnull final String paymentId) throws DatabaseException, PaymentException {
@@ -80,6 +78,18 @@ public abstract class AbstractPaymentService implements PaymentService {
                     "Failed to complete payment"
             );
         }
+    }
+
+    protected void publishPaymentEvent(@Nonnull final PaymentDetail paymentDetail) {
+        Objects.requireNonNull(paymentDetail, "Payment detail is null");
+        final PaymentEvent paymentEvent = new PaymentEvent(
+                Objects.requireNonNull(paymentDetail.getUserId(), "userId is null"),
+                Objects.requireNonNull(paymentDetail.getPlanId(), "planId is null"),
+                Objects.requireNonNull(paymentDetail.getAmount(), "amount is null"),
+                Objects.requireNonNull(paymentDetail.getCurrency(), "currency is null"),
+                Objects.requireNonNull(paymentDetail.getPaymentGateway(), "payment gateway is null")
+        );
+        paymentEventPublisher.publish(paymentEvent);
     }
 
 }

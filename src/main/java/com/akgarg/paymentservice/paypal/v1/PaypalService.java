@@ -1,6 +1,7 @@
-package com.akgarg.paymentservice.v1.paypal;
+package com.akgarg.paymentservice.paypal.v1;
 
 import com.akgarg.paymentservice.db.DatabaseService;
+import com.akgarg.paymentservice.eventpublisher.PaymentEventPublisher;
 import com.akgarg.paymentservice.exception.PaymentException;
 import com.akgarg.paymentservice.payment.PaymentDetail;
 import com.akgarg.paymentservice.payment.PaymentStatus;
@@ -39,8 +40,12 @@ public class PaypalService extends AbstractPaymentService {
     private final String uiCaptureUrl;
     private final String uiCancelUrl;
 
-    public PaypalService(final DatabaseService databaseService, final PayPalHttpClient httpClient) {
-        super(databaseService);
+    public PaypalService(
+            @Nonnull final PayPalHttpClient httpClient,
+            @Nonnull final DatabaseService databaseService,
+            @Nonnull final PaymentEventPublisher paymentEventPublisher
+    ) {
+        super(databaseService, paymentEventPublisher);
         this.httpClient = httpClient;
         final Dotenv dotenv = Dotenv.load();
         this.uiCaptureUrl = Objects.requireNonNull(dotenv.get("PAYPAL_FRONTEND_CAPTURE_URL"), "Paypal UI capture URL not found in env");
@@ -127,10 +132,11 @@ public class PaypalService extends AbstractPaymentService {
         final var order = httpResponse.result();
 
         if ("COMPLETED".equalsIgnoreCase(order.status())) {
-            LOG.info("{} marking payment status as COMPLETED with id={}", traceId, paymentId);
+            LOG.info("{} setting payment status as COMPLETED with id={}", traceId, paymentId);
             paymentDetail.setPaymentStatus(PaymentStatus.COMPLETED);
             paymentDetail.setPaymentCompletedAt(Instant.now());
             updatePaymentDetails(paymentDetail);
+            publishPaymentEvent(paymentDetail);
             return new CompletePaymentResponse(
                     HttpStatus.OK.value(),
                     paymentId,

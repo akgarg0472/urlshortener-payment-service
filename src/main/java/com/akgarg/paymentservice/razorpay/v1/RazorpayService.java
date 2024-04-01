@@ -1,6 +1,7 @@
-package com.akgarg.paymentservice.v1.razorpay;
+package com.akgarg.paymentservice.razorpay.v1;
 
 import com.akgarg.paymentservice.db.DatabaseService;
+import com.akgarg.paymentservice.eventpublisher.PaymentEventPublisher;
 import com.akgarg.paymentservice.exception.PaymentException;
 import com.akgarg.paymentservice.payment.PaymentDetail;
 import com.akgarg.paymentservice.payment.PaymentStatus;
@@ -34,9 +35,10 @@ public class RazorpayService extends AbstractPaymentService {
 
     public RazorpayService(
             final RazorpayClient razorpayClient,
-            final DatabaseService databaseService
+            final DatabaseService databaseService,
+            final PaymentEventPublisher paymentEventPublisher
     ) {
-        super(databaseService);
+        super(databaseService, paymentEventPublisher);
         this.razorpayClient = razorpayClient;
     }
 
@@ -53,17 +55,21 @@ public class RazorpayService extends AbstractPaymentService {
         orderRequest.put("notes", getOrderNotes(createPaymentRequest));
 
         final Order order;
+        final String orderId;
 
         try {
             order = razorpayClient.orders.create(orderRequest);
-        } catch (RazorpayException e) {
-            LOG.error("{} error creating payment order due to gateway error: {}", traceId, e.getMessage(), e);
-            throw new PaymentException(500, null, "Gateway error creating payment order. Please try again");
+            orderId = order.toJson().getString("id");
+            savePaymentInDatabase(createPaymentRequest, traceId, orderId, PAYMENT_GATEWAY_NAME);
+        } catch (Exception e) {
+            LOG.error("{} error creating payment order", traceId, e);
+
+            if (e instanceof RazorpayException) {
+                throw new PaymentException(500, null, "Gateway error creating payment order. Please try again");
+            } else {
+                throw new PaymentException(500, null, "Error creating payment. Please try again");
+            }
         }
-
-        final String orderId = order.toJson().getString("id");
-
-        savePaymentInDatabase(createPaymentRequest, traceId, orderId, PAYMENT_GATEWAY_NAME);
 
         return new CreatePaymentResponse(
                 traceId,
@@ -93,6 +99,8 @@ public class RazorpayService extends AbstractPaymentService {
         paymentDetail.setPaymentStatus(PaymentStatus.COMPLETED);
         paymentDetail.setPaymentCompletedAt(Instant.now());
         updatePaymentDetails(paymentDetail);
+
+        publishPaymentEvent(paymentDetail);
 
         return new CompletePaymentResponse(
                 HttpStatus.OK.value(),

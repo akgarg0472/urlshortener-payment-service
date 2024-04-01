@@ -3,7 +3,6 @@ package com.akgarg.paymentservice.db;
 import com.akgarg.paymentservice.exception.DatabaseException;
 import com.akgarg.paymentservice.payment.PaymentDetail;
 import org.springframework.context.annotation.Profile;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -29,8 +28,7 @@ public class InMemoryDatabaseService implements DatabaseService {
     public boolean savePaymentDetails(final PaymentDetail paymentDetail) throws DatabaseException {
         if (paymentDetails.containsKey(paymentDetail.getPaymentId())) {
             throw new DatabaseException(
-                    "Payment details already exists",
-                    HttpStatus.CONFLICT.value()
+                    "Payment details already exists"
             );
         }
 
@@ -42,8 +40,7 @@ public class InMemoryDatabaseService implements DatabaseService {
     public boolean updatePaymentDetails(final PaymentDetail paymentDetail) throws DatabaseException {
         if (!paymentDetails.containsKey(paymentDetail.getPaymentId())) {
             throw new DatabaseException(
-                    "Payment details not found with id: " + paymentDetail.getPaymentId(),
-                    HttpStatus.NOT_FOUND.value()
+                    "Payment details not found with id: " + paymentDetail.getPaymentId()
             );
         }
 
@@ -69,8 +66,7 @@ public class InMemoryDatabaseService implements DatabaseService {
     public boolean deletePaymentDetails(final String paymentId) throws DatabaseException {
         if (!paymentDetails.containsKey(paymentId)) {
             throw new DatabaseException(
-                    "Payment details not found with id: " + paymentId,
-                    HttpStatus.NOT_FOUND.value()
+                    "Payment details not found with id: " + paymentId
             );
         }
 

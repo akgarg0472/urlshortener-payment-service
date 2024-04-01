@@ -30,17 +30,6 @@ class GlobalExceptionHandler {
                 ));
     }
 
-    @ExceptionHandler(DatabaseException.class)
-    public ResponseEntity<ApiErrorResponse> handleDatabaseException(final DatabaseException databaseException) {
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(new ApiErrorResponse(
-                        databaseException.errorStatusCode(),
-                        databaseException.getMessage(),
-                        null
-                ));
-    }
-
     @ExceptionHandler(PaymentException.class)
     public ResponseEntity<ApiErrorResponse> handlePaymentException(final PaymentException paymentException) {
         return ResponseEntity
@@ -53,10 +42,10 @@ class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiErrorResponse> handleException(final Exception exception) {
-        exception.printStackTrace();
+    public ResponseEntity<ApiErrorResponse> handleException(final Exception e) {
+        e.printStackTrace();
 
-        final ApiErrorResponse paymentFailureResponse = switch (exception.getClass().getSimpleName()) {
+        final ApiErrorResponse paymentFailureResponse = switch (e.getClass().getSimpleName()) {
             case "HttpRequestMethodNotSupportedException" -> new ApiErrorResponse(405, "Method not allowed", null);
             case "HttpMediaTypeNotSupportedException" -> new ApiErrorResponse(400, "Media type is not supported", null);
             case "HttpMessageNotReadableException" ->
@@ -64,7 +53,7 @@ class GlobalExceptionHandler {
             case "NoResourceFoundException" -> new ApiErrorResponse(
                     404,
                     "Not Found",
-                    List.of("Requested resource not found: " + ((NoResourceFoundException) exception).getResourcePath())
+                    List.of("Requested resource not found: " + ((NoResourceFoundException) e).getResourcePath())
             );
             default -> new ApiErrorResponse(500, "Internal server error", null);
         };

@@ -1,6 +1,7 @@
 package com.akgarg.paymentservice.payment;
 
-import lombok.AllArgsConstructor;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -12,12 +13,15 @@ import java.time.Instant;
  */
 @Getter
 @Setter
-@AllArgsConstructor
+@Entity
 public final class PaymentDetail {
 
-    private String traceId;
+    @Id
     private String paymentId;
+
+    private String traceId;
     private String userId;
+    private String planId;
     private Long amount;
     private PaymentStatus paymentStatus;
     private String currency;
