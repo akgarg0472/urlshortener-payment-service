@@ -41,12 +41,12 @@ public class PaypalService extends AbstractPaymentService {
     private final String uiCancelUrl;
 
     public PaypalService(
-            @Nonnull final PayPalHttpClient httpClient,
+            @Nonnull final PayPalHttpClient payPalHttpClient,
             @Nonnull final DatabaseService databaseService,
             @Nonnull final PaymentEventPublisher paymentEventPublisher
     ) {
         super(databaseService, paymentEventPublisher);
-        this.httpClient = httpClient;
+        this.httpClient = payPalHttpClient;
         final Dotenv dotenv = Dotenv.load();
         this.uiCaptureUrl = Objects.requireNonNull(dotenv.get("PAYPAL_FRONTEND_CAPTURE_URL"), "Paypal UI capture URL not found in env");
         this.uiCancelUrl = Objects.requireNonNull(dotenv.get("PAYPAL_FRONTEND_CANCEL_URL"), "Paypal UI cancel URL not found in env");
