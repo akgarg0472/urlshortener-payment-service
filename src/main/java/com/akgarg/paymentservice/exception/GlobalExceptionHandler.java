@@ -1,6 +1,7 @@
 package com.akgarg.paymentservice.exception;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -16,6 +17,7 @@ import java.util.List;
  * @author Akhilesh Garg
  * @since 11/11/23
  */
+@Slf4j
 @RestControllerAdvice
 class GlobalExceptionHandler {
 
@@ -33,23 +35,23 @@ class GlobalExceptionHandler {
     @ExceptionHandler(PaymentException.class)
     public ResponseEntity<ApiErrorResponse> handlePaymentException(final PaymentException paymentException) {
         return ResponseEntity
-                .status(paymentException.statusCode())
+                .status(paymentException.getStatusCode())
                 .body(new ApiErrorResponse(
-                        paymentException.statusCode(),
+                        paymentException.getStatusCode(),
                         paymentException.getMessage(),
-                        paymentException.errors()
+                        paymentException.getErrors()
                 ));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleException(final Exception e) {
-        e.printStackTrace();
+        log.error("Exception occurred", e);
 
-        final ApiErrorResponse paymentFailureResponse = switch (e.getClass().getSimpleName()) {
+        final var paymentFailureResponse = switch (e.getClass().getSimpleName()) {
             case "HttpRequestMethodNotSupportedException" -> new ApiErrorResponse(405, "Method not allowed", null);
             case "HttpMediaTypeNotSupportedException" -> new ApiErrorResponse(400, "Media type is not supported", null);
             case "HttpMessageNotReadableException" ->
-                    new ApiErrorResponse(400, "Please provide valid payment params", null);
+                    new ApiErrorResponse(400, "Please provide valid request body", null);
             case "NoResourceFoundException" -> new ApiErrorResponse(
                     404,
                     "Not Found",

@@ -1,11 +1,10 @@
 package com.akgarg.paymentservice.paypal.v1;
 
-import com.paypal.core.PayPalEnvironment;
-import com.paypal.core.PayPalHttpClient;
-import io.github.cdimascio.dotenv.Dotenv;
+import com.paypal.sdk.PaypalServerSdkClient;
+import com.paypal.sdk.authentication.ClientCredentialsAuthModel;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
+import org.springframework.core.env.Environment;
 
 import java.util.Objects;
 
@@ -13,13 +12,21 @@ import java.util.Objects;
 public class PaypalConfiguration {
 
     @Bean
-    @Profile("dev")
-    public PayPalHttpClient paypalDevHttpEnvironmentClient() {
-        final Dotenv dotenv = Dotenv.load();
-        return new PayPalHttpClient(new PayPalEnvironment.Sandbox(
-                Objects.requireNonNull(dotenv.get("PAYPAL_SAND_API_CLIENT_KEY"), "Paypal Sand API client key not found"),
-                Objects.requireNonNull(dotenv.get("PAYPAL_SAND_API_SECRET_KEY"), "Paypal Sand API secret not found")
-        ));
+    public PaypalServerSdkClient paypalDevHttpEnvironmentClient(final Environment environment) {
+        final var paypalEnvironment = com.paypal.sdk.Environment.fromString(
+                Objects.requireNonNull(environment.getProperty("paypal.environment"), "Environment property 'paypal.environment' is required")
+        );
+
+        final var clientCredentialsAuthModel = new ClientCredentialsAuthModel.Builder(
+                Objects.requireNonNull(environment.getProperty("paypal.oauth.client-id"), "Environment property 'paypal.oauth.client-id' is required"),
+                Objects.requireNonNull(environment.getProperty("paypal.oauth.client-secret"), "Environment property 'paypal.oauth.client-secret' is required")
+        ).build();
+
+        return new PaypalServerSdkClient.Builder()
+                .httpClientConfig(configBuilder -> configBuilder.timeout(0))
+                .clientCredentialsAuth(clientCredentialsAuthModel)
+                .environment(paypalEnvironment)
+                .build();
     }
 
 }

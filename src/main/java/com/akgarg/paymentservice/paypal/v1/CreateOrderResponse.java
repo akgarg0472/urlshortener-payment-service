@@ -1,17 +1,16 @@
-package com.akgarg.paymentservice.response;
+package com.akgarg.paymentservice.paypal.v1;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.annotation.Nullable;
 
 import java.util.Collection;
 
-public record CreatePaymentResponse(
+public record CreateOrderResponse(
+        @JsonProperty("status_code") int statusCode,
         @JsonProperty("trace_id") String traceId,
         @JsonProperty("message") String message,
-        @JsonIgnore int statusCode,
         @Nullable @JsonProperty("payment_id") String orderId,
-        @Nullable @JsonProperty("redirect_uri") String redirectUrl,
+        @Nullable @JsonProperty("approval_url") String approvalUrl,
         @Nullable @JsonProperty("errors") Collection<String> errors
 ) {
 }

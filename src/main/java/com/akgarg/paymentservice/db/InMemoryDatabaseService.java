@@ -2,6 +2,7 @@ package com.akgarg.paymentservice.db;
 
 import com.akgarg.paymentservice.exception.DatabaseException;
 import com.akgarg.paymentservice.payment.PaymentDetail;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +16,7 @@ import java.util.Optional;
  * @since 11/11/23
  */
 @Service
+@Slf4j
 @Profile("dev")
 public class InMemoryDatabaseService implements DatabaseService {
 
@@ -25,52 +27,68 @@ public class InMemoryDatabaseService implements DatabaseService {
     }
 
     @Override
-    public boolean savePaymentDetails(final PaymentDetail paymentDetail) throws DatabaseException {
-        if (paymentDetails.containsKey(paymentDetail.getPaymentId())) {
+    public PaymentDetail savePaymentDetails(final String requestId, final PaymentDetail paymentDetail) throws DatabaseException {
+        log.info("[{}] Saving payment details: {}", requestId, paymentDetail);
+
+        if (paymentDetails.containsKey(paymentDetail.getId())) {
             throw new DatabaseException(
                     "Payment details already exists"
             );
         }
 
-        paymentDetails.put(paymentDetail.getPaymentId(), paymentDetail);
-        return true;
+        paymentDetails.put(paymentDetail.getId(), paymentDetail);
+
+        return paymentDetail;
     }
 
     @Override
-    public boolean updatePaymentDetails(final PaymentDetail paymentDetail) throws DatabaseException {
-        if (!paymentDetails.containsKey(paymentDetail.getPaymentId())) {
+    public PaymentDetail updatePaymentDetails(final String requestId, final PaymentDetail paymentDetail) throws DatabaseException {
+        log.info("[{}] Updating payment details: {}", requestId, paymentDetail);
+
+        if (!paymentDetails.containsKey(paymentDetail.getId())) {
+            log.error("[{}] Payment detail with id {} not found", requestId, paymentDetail.getId());
+
             throw new DatabaseException(
-                    "Payment details not found with id: " + paymentDetail.getPaymentId()
+                    "Payment details not found with id: " + paymentDetail.getId()
             );
         }
 
-        paymentDetails.put(paymentDetail.getPaymentId(), paymentDetail);
-        return true;
+        paymentDetail.setUpdatedAt(System.currentTimeMillis());
+        paymentDetails.put(paymentDetail.getId(), paymentDetail);
+        return paymentDetail;
     }
 
     @Override
-    public Optional<PaymentDetail> getPaymentDetails(final String paymentId) throws DatabaseException {
+    public Optional<PaymentDetail> getPaymentDetails(final String requestId, final String paymentId) throws DatabaseException {
+        log.info("[{}] Getting payment details for id: {}", requestId, paymentId);
         return Optional.ofNullable(paymentDetails.get(paymentId));
     }
 
     @Override
-    public List<PaymentDetail> getAllPaymentDetails(final String userId) throws DatabaseException {
+    public List<PaymentDetail> getAllPaymentDetails(final String requestId, final String userId) throws DatabaseException {
+        log.info("[{}] Getting payment details: {}", requestId, userId);
+
         return paymentDetails
                 .values()
                 .stream()
-                .filter(paymentDetail -> paymentDetail.getUserId().equals(userId))
+                .filter(pd -> pd.getUserId().equals(userId) && !pd.isDeleted())
                 .toList();
     }
 
     @Override
-    public boolean deletePaymentDetails(final String paymentId) throws DatabaseException {
+    public boolean deletePaymentDetails(final String requestId, final String paymentId) throws DatabaseException {
+        log.info("[{}] Deleting payment details for id: {}", requestId, paymentId);
+
         if (!paymentDetails.containsKey(paymentId)) {
+            log.error("[{}] Payment detail not found with id: {}", requestId, paymentId);
+
             throw new DatabaseException(
                     "Payment details not found with id: " + paymentId
             );
         }
 
-        return paymentDetails.remove(paymentId) != null;
+        paymentDetails.get(paymentId).setDeleted(true);
+        return true;
     }
 
 }

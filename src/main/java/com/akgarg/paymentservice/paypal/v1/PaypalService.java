@@ -1,171 +1,218 @@
 package com.akgarg.paymentservice.paypal.v1;
 
 import com.akgarg.paymentservice.db.DatabaseService;
-import com.akgarg.paymentservice.eventpublisher.PaymentEventPublisher;
 import com.akgarg.paymentservice.exception.PaymentException;
 import com.akgarg.paymentservice.payment.PaymentDetail;
+import com.akgarg.paymentservice.payment.PaymentDetailDto;
 import com.akgarg.paymentservice.payment.PaymentStatus;
-import com.akgarg.paymentservice.payment.service.AbstractPaymentService;
-import com.akgarg.paymentservice.request.CompletePaymentRequest;
-import com.akgarg.paymentservice.request.CreatePaymentRequest;
-import com.akgarg.paymentservice.request.VerifyPaymentRequest;
-import com.akgarg.paymentservice.response.CompletePaymentResponse;
-import com.akgarg.paymentservice.response.CreatePaymentResponse;
-import com.akgarg.paymentservice.response.VerifyPaymentResponse;
-import com.paypal.core.PayPalHttpClient;
-import com.paypal.http.HttpResponse;
-import com.paypal.orders.*;
-import io.github.cdimascio.dotenv.Dotenv;
-import jakarta.annotation.Nonnull;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.jetbrains.annotations.NotNull;
+import com.paypal.sdk.PaypalServerSdkClient;
+import com.paypal.sdk.models.*;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.Map;
 import java.util.Objects;
 
 @Service
-public class PaypalService extends AbstractPaymentService {
+@Slf4j
+@RequiredArgsConstructor
+public class PaypalService {
 
-    private static final Logger LOG = LogManager.getLogger(PaypalService.class);
-    private static final String PAYMENT_GATEWAY_NAME = "Paypal";
+    private static final String FAILED_TO_PROCESS_PAYMENT_REQ_MSG = "Failed to process the payment request";
+    private static final String PAYMENT_GATEWAY_NAME = "paypal";
 
-    private final PayPalHttpClient httpClient;
+    private final PaypalServerSdkClient paypalClient;
+    private final DatabaseService databaseService;
+    private final Environment environment;
 
-    private final String uiCaptureUrl;
-    private final String uiCancelUrl;
+    public CreateOrderResponse createOrder(final String requestId, final String userId, final CreateOrderRequest request) throws Exception {
+        log.info("[{}] Create order request: {}", requestId, request);
 
-    public PaypalService(
-            @Nonnull final PayPalHttpClient payPalHttpClient,
-            @Nonnull final DatabaseService databaseService,
-            @Nonnull final PaymentEventPublisher paymentEventPublisher
-    ) {
-        super(databaseService, paymentEventPublisher);
-        this.httpClient = payPalHttpClient;
-        final Dotenv dotenv = Dotenv.load();
-        this.uiCaptureUrl = Objects.requireNonNull(dotenv.get("PAYPAL_FRONTEND_CAPTURE_URL"), "Paypal UI capture URL not found in env");
-        this.uiCancelUrl = Objects.requireNonNull(dotenv.get("PAYPAL_FRONTEND_CANCEL_URL"), "Paypal UI cancel URL not found in env");
-    }
-
-    public CreatePaymentResponse createPayment(@Nonnull final CreatePaymentRequest createPaymentRequest) {
-        final String traceId = createPaymentRequest.userId() + "-" + System.currentTimeMillis();
-
-        LOG.info("{} create payment received for amount={}", traceId, createPaymentRequest.amount());
-
-        final var orderRequest = new OrderRequest();
-        orderRequest.checkoutPaymentIntent("CAPTURE");
-
-        final var amountBreakdown = new AmountWithBreakdown()
-                .currencyCode(createPaymentRequest.currency())
-                .value(String.valueOf(createPaymentRequest.amount()));
-
-        final var purchaseUnitRequest = new PurchaseUnitRequest()
-                .amountWithBreakdown(amountBreakdown);
-        orderRequest.purchaseUnits(List.of(purchaseUnitRequest));
-
-        final var applicationContext = new ApplicationContext()
-                .returnUrl(uiCaptureUrl)
-                .cancelUrl(uiCancelUrl);
-        orderRequest.applicationContext(applicationContext);
-
-        final var ordersCreateRequest = new OrdersCreateRequest().requestBody(orderRequest);
-
-        final HttpResponse<Order> orderHttpResponse;
-
-        try {
-            orderHttpResponse = httpClient.execute(ordersCreateRequest);
-        } catch (IOException e) {
-            LOG.error("{} error creating payment order due to gateway error: {}", traceId, e.getMessage(), e);
-            throw new PaymentException(500, null, "Payment Gateway Error. Please try again");
+        if (userId != null && request.userId() != null && !userId.equals(request.userId())) {
+            log.error("[{}] User id is not the same as the requested user id", requestId);
+            throw new PaymentException(requestId, HttpStatus.BAD_REQUEST.value(), List.of("UserId in header and request body mismatch"), "Request validation failed");
         }
 
-        final Order order = orderHttpResponse.result();
+        final var amount = new AmountWithBreakdown.Builder()
+                .currencyCode(request.currencyCode())
+                .value(String.valueOf(request.amount()))
+                .build();
 
-        final var redirectUrl = order.links()
-                .stream()
-                .filter(link -> "approve".equals(link.rel()))
-                .findFirst()
-                .orElseThrow(() -> new NoSuchElementException("No 'approve' link found in order"))
-                .href();
+        final var purchaseUnitRequest = new PurchaseUnitRequest.Builder()
+                .amount(amount)
+                .build();
 
-        final String orderId = order.id();
+        final var paymentMethod = new PaymentMethodPreference.Builder()
+                .payeePreferred(PayeePaymentMethodPreference.IMMEDIATE_PAYMENT_REQUIRED)
+                .build();
 
-        savePaymentInDatabase(createPaymentRequest, traceId, orderId, PAYMENT_GATEWAY_NAME);
+        final var applicationContext = new OrderApplicationContext.Builder()
+                .returnUrl(Objects.requireNonNull(environment.getProperty("paypal.order.return-url")))
+                .cancelUrl(Objects.requireNonNull(environment.getProperty("paypal.order.cancel-url")))
+                .userAction(OrderApplicationContextUserAction.PAY_NOW)
+                .paymentMethod(paymentMethod)
+                .build();
 
-        return new CreatePaymentResponse(
-                traceId,
-                "Payment created successfully",
+        final var orderRequest = new OrderRequest.Builder()
+                .intent(CheckoutPaymentIntent.CAPTURE)
+                .purchaseUnits(List.of(purchaseUnitRequest))
+                .applicationContext(applicationContext)
+                .build();
+
+        final var ordersCreateInput = new OrdersCreateInput.Builder()
+                .body(orderRequest)
+                .prefer("return=representation")
+                .build();
+
+        final var orderApiResponse = paypalClient.getOrdersController().ordersCreate(ordersCreateInput);
+        final var order = orderApiResponse.getResult();
+
+        log.info("[{}] Payment order created: {}", requestId, order);
+
+        if (order.getPurchaseUnits().size() != 1) {
+            log.error("[{}] Payment order does not have valid purchase units", requestId);
+            throw new PaymentException(requestId, HttpStatus.INTERNAL_SERVER_ERROR.value(), List.of(FAILED_TO_PROCESS_PAYMENT_REQ_MSG), "Failed to create order");
+        }
+
+        final var approvalLink = order.getLinks().stream().filter(link -> "approve".equals(link.getRel())).findFirst();
+
+        if (approvalLink.isEmpty()) {
+            log.error("[{}] Payment order created but no approval link found", requestId);
+            throw new PaymentException(requestId, HttpStatus.INTERNAL_SERVER_ERROR.value(), List.of(FAILED_TO_PROCESS_PAYMENT_REQ_MSG), "Failed to create order");
+        }
+
+        final var paymentDetails = saveOrderInDatabase(requestId, userId, request.packId(), order);
+
+        log.info("[{}] Payment order created with id: {}", requestId, paymentDetails.getId());
+
+        return new CreateOrderResponse(
                 HttpStatus.CREATED.value(),
-                orderId,
-                redirectUrl,
-                null
+                requestId,
+                "Payment order created successfully",
+                paymentDetails.getId(),
+                approvalLink.get().getHref(),
+                Collections.emptyList());
+    }
+
+    public GetOrderResponse getOrderByOrderId(final String requestId, final String orderId) {
+        log.info("[{}] Get order request: {}", requestId, orderId);
+
+        final var paymentDetailOptional = databaseService.getPaymentDetails(requestId, orderId);
+
+        if (paymentDetailOptional.isEmpty()) {
+            log.error("[{}] Payment order not found", requestId);
+            return new GetOrderResponse(
+                    HttpStatus.BAD_REQUEST.value(),
+                    requestId,
+                    "No payment order found with id: " + orderId,
+                    null
+            );
+        }
+
+        final var paymentDetailDto = PaymentDetailDto.fromPaymentDetail(paymentDetailOptional.get());
+
+        return new GetOrderResponse(
+                HttpStatus.OK.value(),
+                requestId,
+                "Payment order fetched successfully",
+                paymentDetailDto
         );
     }
 
-    public CompletePaymentResponse completePayment(@NotNull final CompletePaymentRequest completePaymentRequest) {
-        final String paymentId = completePaymentRequest.paymentId();
-        String traceId = "";
+    public void processWebhook(final Map<String, Object> requestBody) throws Exception {
+        log.info("Paypal Webhook request: {}", requestBody);
+        final var eventType = PaypalWebhookEventType.fromValue(requestBody.get("event_type").toString());
 
-        final PaymentDetail paymentDetail = getPaymentDetailByPaymentId(paymentId);
-
-        traceId = paymentDetail.getTraceId();
-
-        LOG.info("{} complete payment request received for paymentId={}", traceId, paymentId);
-
-        validatePaymentStatusForPaymentCompletion(paymentDetail);
-
-        final var ordersCaptureRequest = new OrdersCaptureRequest(paymentId);
-        final HttpResponse<Order> httpResponse;
-
-        try {
-            httpResponse = httpClient.execute(ordersCaptureRequest);
-        } catch (IOException e) {
-            LOG.error("{} error completing payment order due to gateway error: {}", traceId, e.getMessage(), e);
-            throw new PaymentException(500, null, "Gateway error completing payment order. Please try again");
+        if (eventType.isEmpty()) {
+            log.info("Not processing webhook request for event: {}", requestBody.get("event_type"));
+            return;
         }
 
-        final var order = httpResponse.result();
+        switch (eventType.get()) {
+            case ORDER_APPROVED -> handleOrderApprovedWebhook(requestBody);
+            case PAYMENT_CAPTURE_COMPLETE -> handlePaymentCaptureCompleteWebhook(requestBody);
+            default -> log.warn("Unsupported event type: {}", eventType);
+        }
+    }
 
-        if ("COMPLETED".equalsIgnoreCase(order.status())) {
-            LOG.info("{} setting payment status as COMPLETED with id={}", traceId, paymentId);
-            paymentDetail.setPaymentStatus(PaymentStatus.COMPLETED);
-            paymentDetail.setPaymentCompletedAt(Instant.now());
-            updatePaymentDetails(paymentDetail);
-            publishPaymentEvent(paymentDetail);
-            return new CompletePaymentResponse(
-                    HttpStatus.OK.value(),
-                    paymentId,
-                    paymentDetail.getPaymentStatus().name(),
-                    "Payment completed successfully"
-            );
+    private void handleOrderApprovedWebhook(final Map<String, Object> requestBody) throws Exception {
+        final var webhookId = requestBody.get("id").toString();
+        log.info("[{}] Processing Paypal Webhook {} request", webhookId, PaypalWebhookEventType.ORDER_APPROVED);
+
+        final String paymentId;
+
+        if (requestBody.get("resource") instanceof Map<?, ?> resourceMap) {
+            paymentId = resourceMap.get("id").toString();
         } else {
-            LOG.error("{} complete payment failed id={}", traceId, paymentId);
-            paymentDetail.setPaymentStatus(PaymentStatus.FAILED);
-            updatePaymentDetails(paymentDetail);
-            paymentDetail.setPaymentCompletedAt(Instant.now());
-            return new CompletePaymentResponse(
-                    HttpStatus.OK.value(),
-                    paymentId,
-                    PaymentStatus.FAILED.name(),
-                    "Failed to complete payment. Please try again!"
-            );
+            throw new PaymentException(webhookId, HttpStatus.BAD_REQUEST.value(), List.of("Failed to extract order Id"), FAILED_TO_PROCESS_PAYMENT_REQ_MSG);
         }
+
+        final var paymentDetails = databaseService.getPaymentDetails(webhookId, paymentId);
+
+        if (paymentDetails.isEmpty()) {
+            log.warn("[{}] No payment details found for payment id: {}}", webhookId, paymentId);
+            throw new PaymentException("Webhook", HttpStatus.NOT_FOUND.value(), List.of("No payment details found"), "Webhook processing failed");
+        }
+
+        log.info("[{}] updating payment status to {}", webhookId, PaymentStatus.PROCESSING);
+        paymentDetails.get().setPaymentStatus(PaymentStatus.PROCESSING);
+        databaseService.updatePaymentDetails(webhookId, paymentDetails.get());
+
+        final var ordersCaptureInput = new OrdersCaptureInput.Builder()
+                .id(paymentId)
+                .prefer("return=representation")
+                .build();
+        log.info("[{}] Sending order capture request: {}", webhookId, ordersCaptureInput);
+        final var orderCaptureResponse = paypalClient.getOrdersController().ordersCapture(ordersCaptureInput);
+        log.info("[{}] Order capture response: {}", webhookId, orderCaptureResponse.getStatusCode());
     }
 
-    @Override
-    public VerifyPaymentResponse verifyPayment(@NotNull final VerifyPaymentRequest verifyPaymentRequest) {
-        // TODO implement
-        return null;
+    private void handlePaymentCaptureCompleteWebhook(final Map<String, Object> requestBody) {
+        final var webhookId = requestBody.get("id").toString();
+        log.info("[{}] Processing Paypal Webhook {} request", webhookId, PaypalWebhookEventType.PAYMENT_CAPTURE_COMPLETE);
+
+        final String paymentId;
+
+        if (requestBody.get("supplementary_data") instanceof Map<?, ?> supplementaryData && supplementaryData.get("related_ids") instanceof Map<?, ?> relatedIds) {
+            paymentId = relatedIds.get("order_id").toString();
+        } else {
+            log.error("[{}] Failed to extract order id from webhook body", webhookId);
+            throw new PaymentException(webhookId, HttpStatus.BAD_REQUEST.value(), List.of("Failed to extract order Id"), FAILED_TO_PROCESS_PAYMENT_REQ_MSG);
+        }
+
+        final var paymentDetailOptional = databaseService.getPaymentDetails(webhookId, paymentId);
+
+        if (paymentDetailOptional.isEmpty()) {
+            log.warn("[{}] No payment details found for payment id: {}}", webhookId, paymentId);
+            throw new PaymentException("Webhook", HttpStatus.NOT_FOUND.value(), List.of("No payment details found"), "Webhook processing failed");
+        }
+
+        log.info("[{}] updating payment status to {} for id: {}", webhookId, PaymentStatus.COMPLETED, paymentId);
+
+        final var paymentDetail = paymentDetailOptional.get();
+        paymentDetail.setPaymentStatus(PaymentStatus.COMPLETED);
+        paymentDetail.setCompletedAt(System.currentTimeMillis());
+        final var updatedPaymentDetails = databaseService.updatePaymentDetails(webhookId, paymentDetail);
+
+        log.info("[{}] Payment status updated successfully to {} for id: {}", webhookId, updatedPaymentDetails.getPaymentStatus(), updatedPaymentDetails.getId());
     }
 
-    @Override
-    public String getPaymentGatewayName() {
-        return PAYMENT_GATEWAY_NAME;
+    private PaymentDetail saveOrderInDatabase(final String requestId, final String userId, final String packId, final Order order) {
+        final var paymentDetail = new PaymentDetail();
+        paymentDetail.setId(order.getId());
+        paymentDetail.setUserId(userId);
+        paymentDetail.setPackId(packId);
+        paymentDetail.setPaymentStatus(PaymentStatus.CREATED);
+        paymentDetail.setPaymentGateway(PAYMENT_GATEWAY_NAME);
+        paymentDetail.setAmount(order.getPurchaseUnits().getFirst().getAmount().getValue());
+        paymentDetail.setCurrency(order.getPurchaseUnits().getFirst().getAmount().getCurrencyCode());
+        paymentDetail.setDeleted(false);
+        return databaseService.savePaymentDetails(requestId, paymentDetail);
     }
 
 }

@@ -1,5 +1,7 @@
-package com.akgarg.paymentservice.eventpublisher;
+package com.akgarg.paymentservice.eventpublisher.kafka;
 
+import com.akgarg.paymentservice.eventpublisher.PaymentEvent;
+import com.akgarg.paymentservice.eventpublisher.PaymentEventPublisher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.apache.logging.log4j.LogManager;
@@ -21,7 +23,7 @@ public class KafkaPaymentEventPublisher implements PaymentEventPublisher {
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
 
-    @Value(value = "${kafka.payment.topic.name}")
+    @Value(value = "${kafka.payment.success.topic.name}")
     private String paymentTopicName;
 
     @Override

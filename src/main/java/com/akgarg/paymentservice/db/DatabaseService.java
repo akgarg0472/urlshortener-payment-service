@@ -12,14 +12,14 @@ import java.util.Optional;
  */
 public interface DatabaseService {
 
-    boolean savePaymentDetails(final PaymentDetail paymentDetail) throws DatabaseException;
+    PaymentDetail savePaymentDetails(String requestId, PaymentDetail paymentDetail) throws DatabaseException;
 
-    boolean updatePaymentDetails(final PaymentDetail paymentDetail) throws DatabaseException;
+    PaymentDetail updatePaymentDetails(String requestId, PaymentDetail paymentDetail) throws DatabaseException;
 
-    Optional<PaymentDetail> getPaymentDetails(final String paymentId) throws DatabaseException;
+    Optional<PaymentDetail> getPaymentDetails(String requestId, String paymentId) throws DatabaseException;
 
-    List<PaymentDetail> getAllPaymentDetails(final String userId) throws DatabaseException;
+    List<PaymentDetail> getAllPaymentDetails(String requestId, String userId) throws DatabaseException;
 
-    boolean deletePaymentDetails(final String paymentId) throws DatabaseException;
+    boolean deletePaymentDetails(String requestId, String paymentId) throws DatabaseException;
 
 }

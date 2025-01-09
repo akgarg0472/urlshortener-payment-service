@@ -3,7 +3,7 @@ package com.akgarg.paymentservice.payment;
 public enum PaymentStatus {
 
     CREATED,
-    PENDING,
+    PROCESSING,
     COMPLETED,
     FAILED
 

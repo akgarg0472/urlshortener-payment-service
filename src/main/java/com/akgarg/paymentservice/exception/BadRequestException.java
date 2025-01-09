@@ -8,9 +8,7 @@ public class BadRequestException extends RuntimeException {
 
     private final Collection<String> errors;
 
-    public BadRequestException(
-            @Nullable final Collection<String> errors
-    ) {
+    public BadRequestException(@Nullable final Collection<String> errors) {
         super();
         this.errors = errors;
     }

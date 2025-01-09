@@ -1,3 +1,6 @@
+server:
+  port: 9090
+
 spring:
   application:
     name: urlshortener-payment-service
@@ -5,3 +8,15 @@ spring:
     active: dev
   jackson:
     default-property-inclusion: non_null
+
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+paypal:
+  order:
+    cancel-url: http://localhost:3000/dashboard/paypal/cancel
+    return-url: http://localhost:3000/dashboard/paypal/success
