@@ -14,7 +14,7 @@ import org.springframework.kafka.core.ProducerFactory;
 import java.util.HashMap;
 
 @Configuration
-@Profile("prod")
+@Profile({"prod", "PROD"})
 public class KafkaConfigs {
 
     @Value(value = "${spring.kafka.bootstrap-servers}")
@@ -40,6 +40,7 @@ public class KafkaConfigs {
         configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapAddress);
         configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        configProps.put(ProducerConfig.ACKS_CONFIG, "all");
         return new DefaultKafkaProducerFactory<>(configProps);
     }
 

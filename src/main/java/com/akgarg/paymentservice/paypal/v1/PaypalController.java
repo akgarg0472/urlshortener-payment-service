@@ -1,5 +1,10 @@
 package com.akgarg.paymentservice.paypal.v1;
 
+import com.akgarg.paymentservice.paypal.v1.request.CaptureOrderRequest;
+import com.akgarg.paymentservice.paypal.v1.request.CreateOrderRequest;
+import com.akgarg.paymentservice.paypal.v1.response.CaptureOrderResponse;
+import com.akgarg.paymentservice.paypal.v1.response.CreateOrderResponse;
+import com.akgarg.paymentservice.paypal.v1.response.GetOrderResponse;
 import com.akgarg.paymentservice.utils.ValidationUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +30,14 @@ public class PaypalController {
                                            final BindingResult validationResult) throws Exception {
         ValidationUtils.checkAndThrowValidationException(requestId, validationResult);
         return paypalService.createOrder(requestId, userId, request);
+    }
+
+    @PostMapping("/capture")
+    public CaptureOrderResponse captureOrder(@RequestHeader("X-REQUEST-ID") final String requestId,
+                                             @RequestBody @Valid final CaptureOrderRequest captureOrderRequest,
+                                             final BindingResult validationResult) throws Exception {
+        ValidationUtils.checkAndThrowValidationException(requestId, validationResult);
+        return paypalService.captureOrder(requestId, captureOrderRequest);
     }
 
     @GetMapping("/order")

@@ -1,4 +1,4 @@
-package com.akgarg.paymentservice.paypal.v1;
+package com.akgarg.paymentservice.paypal.v1.response;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.annotation.Nullable;
