@@ -28,7 +28,7 @@ public final class PaymentDetail {
     private String packId;
 
     @Column(name = "amount", nullable = false)
-    private String amount;
+    private Double amount;
 
     @Column(name = "status", nullable = false)
     @Enumerated(EnumType.STRING)

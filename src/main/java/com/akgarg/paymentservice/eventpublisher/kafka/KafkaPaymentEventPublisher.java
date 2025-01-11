@@ -30,7 +30,14 @@ public class KafkaPaymentEventPublisher implements PaymentEventPublisher {
     public void publish(final PaymentEvent paymentEvent) {
         serializeEvent(paymentEvent)
                 .ifPresent(eventJson -> kafkaTemplate.send(paymentTopicName, eventJson)
-                        .whenComplete((s1, s2) -> LOGGER.info("{}  : {}", s1, s2)));
+                        .whenComplete((result, throwable) -> {
+                            if (throwable != null) {
+                                LOGGER.error(throwable.getMessage(), throwable);
+                            } else {
+                                LOGGER.debug("Kafka event successfully published: {}", result);
+                            }
+                        })
+                );
     }
 
     private Optional<String> serializeEvent(final PaymentEvent paymentEvent) {

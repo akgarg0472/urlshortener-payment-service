@@ -4,7 +4,7 @@ public record PaymentEvent(
         String paymentId,
         String userId,
         String packId,
-        String amount,
+        Double amount,
         String currency,
         String paymentGateway
 ) {

@@ -319,7 +319,7 @@ public class PaypalService {
         paymentDetail.setPackId(packId);
         paymentDetail.setPaymentStatus(PaymentStatus.CREATED);
         paymentDetail.setPaymentGateway(PAYMENT_GATEWAY_NAME);
-        paymentDetail.setAmount(order.getPurchaseUnits().getFirst().getAmount().getValue());
+        paymentDetail.setAmount(Double.valueOf(order.getPurchaseUnits().getFirst().getAmount().getValue()));
         paymentDetail.setCurrency(order.getPurchaseUnits().getFirst().getAmount().getCurrencyCode());
         paymentDetail.setDeleted(false);
         return databaseService.savePaymentDetails(requestId, paymentDetail);

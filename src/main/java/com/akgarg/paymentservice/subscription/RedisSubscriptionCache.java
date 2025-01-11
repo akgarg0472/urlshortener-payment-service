@@ -14,8 +14,6 @@ import org.springframework.web.client.RestClient;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 @Slf4j
 @Component
@@ -30,8 +28,6 @@ public class RedisSubscriptionCache implements SubscriptionCache {
     private static final String ACTIVE_SUBSCRIPTION_REDIS_KEY = "activeSubscriptions";
     private static final String SUBSCRIPTION_PACK_REDIS_KEY = "subscriptionPacks";
 
-    private final ExecutorService populateCacheExecutorService = Executors.newSingleThreadExecutor();
-
     private final RedisTemplate<String, Object> redisTemplate;
     private final RestClient.Builder restClientBuilder;
     private final DiscoveryClient discoveryClient;
@@ -45,27 +41,25 @@ public class RedisSubscriptionCache implements SubscriptionCache {
 
     @Override
     public void populateCache() {
-        populateCacheExecutorService.submit(() -> {
-            final List<Subscription> activeSubscriptions = getActiveSubscriptions();
-            final List<SubscriptionPack> subscriptionPacks = getSubscriptionPacks();
-            final var hashOperations = redisTemplate.opsForHash();
+        final List<Subscription> activeSubscriptions = getActiveSubscriptions();
+        final List<SubscriptionPack> subscriptionPacks = getSubscriptionPacks();
+        final var hashOperations = redisTemplate.opsForHash();
 
-            for (final Subscription subscription : activeSubscriptions) {
-                try {
-                    hashOperations.putIfAbsent(ACTIVE_SUBSCRIPTION_REDIS_KEY, subscription.userId(), subscription);
-                } catch (Exception e) {
-                    log.error("Error while populating {} operation", ACTIVE_SUBSCRIPTION_REDIS_KEY, e);
-                }
+        for (final Subscription subscription : activeSubscriptions) {
+            try {
+                hashOperations.putIfAbsent(ACTIVE_SUBSCRIPTION_REDIS_KEY, subscription.userId(), subscription);
+            } catch (Exception e) {
+                log.error("Error while populating {} operation", ACTIVE_SUBSCRIPTION_REDIS_KEY, e);
             }
+        }
 
-            for (final SubscriptionPack subscriptionPack : subscriptionPacks) {
-                try {
-                    hashOperations.putIfAbsent(SUBSCRIPTION_PACK_REDIS_KEY, subscriptionPack.packId(), subscriptionPack);
-                } catch (Exception e) {
-                    log.error("Error while populating {} operation", SUBSCRIPTION_PACK_REDIS_KEY, e);
-                }
+        for (final SubscriptionPack subscriptionPack : subscriptionPacks) {
+            try {
+                hashOperations.putIfAbsent(SUBSCRIPTION_PACK_REDIS_KEY, subscriptionPack.packId(), subscriptionPack);
+            } catch (Exception e) {
+                log.error("Error while populating {} operation", SUBSCRIPTION_PACK_REDIS_KEY, e);
             }
-        });
+        }
     }
 
     private List<SubscriptionPack> getSubscriptionPacks() {
@@ -88,6 +82,8 @@ public class RedisSubscriptionCache implements SubscriptionCache {
                                     .host(host)
                                     .port(port)
                                     .path(SUBSCRIPTION_PACKS_ENDPOINT)
+                                    .queryParam("page", 0)
+                                    .queryParam("limit", 1000)
                                     .build())
                             .retrieve()
                             .toEntity(new ParameterizedTypeReference<List<SubscriptionPack>>() {

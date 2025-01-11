@@ -9,7 +9,7 @@ public class PaymentDetailDto {
 
     private String id;
     private String packId;
-    private String amount;
+    private Double amount;
     private PaymentStatus paymentStatus;
     private String currency;
     private String paymentMethod;
