@@ -13,7 +13,7 @@
 
     <groupId>com.akgarg</groupId>
     <artifactId>UrlShortenerPaymentService</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>UrlShortenerPaymentService</name>
     <description>Payment service for UrlShortener</description>
 
@@ -139,6 +139,8 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
         </plugins>
+
+        <finalName>UrlShortenerPaymentService</finalName>
     </build>
 
 </project>
