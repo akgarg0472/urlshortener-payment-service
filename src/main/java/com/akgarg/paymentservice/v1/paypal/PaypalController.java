@@ -1,11 +1,11 @@
-package com.akgarg.paymentservice.paypal.v1;
+package com.akgarg.paymentservice.v1.paypal;
 
-import com.akgarg.paymentservice.paypal.v1.request.CaptureOrderRequest;
-import com.akgarg.paymentservice.paypal.v1.request.CreateOrderRequest;
-import com.akgarg.paymentservice.paypal.v1.response.CaptureOrderResponse;
-import com.akgarg.paymentservice.paypal.v1.response.CreateOrderResponse;
-import com.akgarg.paymentservice.paypal.v1.response.GetOrderResponse;
 import com.akgarg.paymentservice.utils.ValidationUtils;
+import com.akgarg.paymentservice.v1.paypal.request.CaptureOrderRequest;
+import com.akgarg.paymentservice.v1.paypal.request.CreateOrderRequest;
+import com.akgarg.paymentservice.v1.paypal.response.CaptureOrderResponse;
+import com.akgarg.paymentservice.v1.paypal.response.CreateOrderResponse;
+import com.akgarg.paymentservice.v1.paypal.response.GetOrderResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,10 +21,11 @@ import java.util.Map;
 @RequestMapping("/api/v1/payments/paypal")
 public class PaypalController {
 
+    private static final String REQUEST_ID_HEADER = "X-Request-ID";
     private final PaypalService paypalService;
 
     @PostMapping("/order")
-    public CreateOrderResponse createOrder(@RequestHeader("X-REQUEST-ID") final String requestId,
+    public CreateOrderResponse createOrder(@RequestHeader(REQUEST_ID_HEADER) final String requestId,
                                            @RequestHeader("X-USER-ID") final String userId,
                                            @RequestBody @Valid final CreateOrderRequest request,
                                            final BindingResult validationResult) throws Exception {
@@ -33,7 +34,7 @@ public class PaypalController {
     }
 
     @PostMapping("/capture")
-    public CaptureOrderResponse captureOrder(@RequestHeader("X-REQUEST-ID") final String requestId,
+    public CaptureOrderResponse captureOrder(@RequestHeader(REQUEST_ID_HEADER) final String requestId,
                                              @RequestBody @Valid final CaptureOrderRequest captureOrderRequest,
                                              final BindingResult validationResult) throws Exception {
         ValidationUtils.checkAndThrowValidationException(requestId, validationResult);
@@ -41,7 +42,7 @@ public class PaypalController {
     }
 
     @GetMapping("/order")
-    public GetOrderResponse getOrder(@RequestHeader("X-REQUEST-ID") final String requestId,
+    public GetOrderResponse getOrder(@RequestHeader(REQUEST_ID_HEADER) final String requestId,
                                      @RequestParam(value = "id") final String orderId) {
         return paypalService.getOrderByOrderId(requestId, orderId);
     }

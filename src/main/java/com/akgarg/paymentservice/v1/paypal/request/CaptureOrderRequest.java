@@ -1,4 +1,4 @@
-package com.akgarg.paymentservice.paypal.v1.request;
+package com.akgarg.paymentservice.v1.paypal.request;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;

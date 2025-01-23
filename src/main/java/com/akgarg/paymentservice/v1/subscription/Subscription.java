@@ -1,4 +1,4 @@
-package com.akgarg.paymentservice.subscription;
+package com.akgarg.paymentservice.v1.subscription;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

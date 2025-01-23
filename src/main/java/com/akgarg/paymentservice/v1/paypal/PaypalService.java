@@ -1,4 +1,4 @@
-package com.akgarg.paymentservice.paypal.v1;
+package com.akgarg.paymentservice.v1.paypal;
 
 import com.akgarg.paymentservice.db.DatabaseService;
 import com.akgarg.paymentservice.eventpublisher.PaymentEvent;
@@ -7,12 +7,12 @@ import com.akgarg.paymentservice.exception.PaymentException;
 import com.akgarg.paymentservice.payment.PaymentDetail;
 import com.akgarg.paymentservice.payment.PaymentDetailDto;
 import com.akgarg.paymentservice.payment.PaymentStatus;
-import com.akgarg.paymentservice.paypal.v1.request.CaptureOrderRequest;
-import com.akgarg.paymentservice.paypal.v1.request.CreateOrderRequest;
-import com.akgarg.paymentservice.paypal.v1.response.CaptureOrderResponse;
-import com.akgarg.paymentservice.paypal.v1.response.CreateOrderResponse;
-import com.akgarg.paymentservice.paypal.v1.response.GetOrderResponse;
-import com.akgarg.paymentservice.subscription.SubscriptionCache;
+import com.akgarg.paymentservice.v1.paypal.request.CaptureOrderRequest;
+import com.akgarg.paymentservice.v1.paypal.request.CreateOrderRequest;
+import com.akgarg.paymentservice.v1.paypal.response.CaptureOrderResponse;
+import com.akgarg.paymentservice.v1.paypal.response.CreateOrderResponse;
+import com.akgarg.paymentservice.v1.paypal.response.GetOrderResponse;
+import com.akgarg.paymentservice.v1.subscription.SubscriptionCache;
 import com.paypal.sdk.PaypalServerSdkClient;
 import com.paypal.sdk.models.*;
 import lombok.RequiredArgsConstructor;
@@ -44,39 +44,63 @@ public class PaypalService {
     public CreateOrderResponse createOrder(final String requestId, final String userId, final CreateOrderRequest request) throws Exception {
         log.info("[{}] Create order request: {}", requestId, request);
 
+        if (userId != null && request.userId() != null && !userId.equals(request.userId())) {
+            log.warn("[{}] User id is not the same as the requested user id", requestId);
+            throw new PaymentException(requestId,
+                    HttpStatus.BAD_REQUEST.value(),
+                    List.of("UserId in header and request body mismatch"),
+                    REQUEST_VALIDATION_FAILED_MSG);
+        }
+
         final var packId = request.packId();
 
         // check if subscription pack exists
-        if (subscriptionCache.getSubscriptionPlan(packId).isEmpty()) {
-            log.error("[{}] No subscription plan for pack {}", requestId, packId);
+        if (subscriptionCache.getSubscriptionPack(requestId, packId).isEmpty()) {
+            log.error("[{}] No subscription plan configured for pack: {}", requestId, packId);
             return new CreateOrderResponse(
                     HttpStatus.BAD_REQUEST.value(),
                     requestId,
                     REQUEST_VALIDATION_FAILED_MSG,
                     null,
                     null,
-                    List.of("Invalid packId provided: " + packId)
+                    List.of("Invalid pack id provided: " + packId)
             );
         }
 
-        // check is user has same pack activated
-        final var activeSubscription = subscriptionCache.getSubscriptions(userId);
+        // check is user has same or some other pack activated
+        final var activeSubscription = subscriptionCache.getActiveSubscription(requestId, userId);
 
-        if (activeSubscription.isPresent() && activeSubscription.get().packId().equals(packId)) {
-            log.error("[{}] Pack {} already exists", requestId, packId);
-            return new CreateOrderResponse(
-                    HttpStatus.CONFLICT.value(),
-                    requestId,
-                    REQUEST_VALIDATION_FAILED_MSG,
-                    null,
-                    null,
-                    List.of("Pack already exists: " + packId)
-            );
-        }
+        if (activeSubscription.isPresent()) {
+            final var subscription = activeSubscription.get();
 
-        if (userId != null && request.userId() != null && !userId.equals(request.userId())) {
-            log.error("[{}] User id is not the same as the requested user id", requestId);
-            throw new PaymentException(requestId, HttpStatus.BAD_REQUEST.value(), List.of("UserId in header and request body mismatch"), REQUEST_VALIDATION_FAILED_MSG);
+            // check if same subscription is activated
+            if (subscription.packId().equals(packId) && subscription.expiresAt() > System.currentTimeMillis()) {
+                log.error("[{}] Pack {} already activated", requestId, packId);
+                return new CreateOrderResponse(
+                        HttpStatus.CONFLICT.value(),
+                        requestId,
+                        REQUEST_VALIDATION_FAILED_MSG,
+                        null,
+                        null,
+                        List.of("Pack already activated: " + activeSubscription.get().packId())
+                );
+            }
+
+            // check if current subscription is not default/free one
+            final var activeSubscriptionPack = subscriptionCache.getSubscriptionPack(requestId, subscription.packId());
+            if (activeSubscriptionPack.isPresent() &&
+                    activeSubscriptionPack.get().defaultPack() != Boolean.TRUE &&
+                    activeSubscriptionPack.get().price() > 0) {
+                log.error("[{}] Pack with id {} already activated", requestId, subscription.packId());
+                return new CreateOrderResponse(
+                        HttpStatus.CONFLICT.value(),
+                        requestId,
+                        REQUEST_VALIDATION_FAILED_MSG,
+                        null,
+                        null,
+                        List.of("Subscription Pack already activated: " + activeSubscription.get().packId())
+                );
+            }
         }
 
         final var amount = new AmountWithBreakdown.Builder()
@@ -117,14 +141,20 @@ public class PaypalService {
 
         if (order.getPurchaseUnits().size() != 1) {
             log.error("[{}] Payment order does not have valid purchase units", requestId);
-            throw new PaymentException(requestId, HttpStatus.INTERNAL_SERVER_ERROR.value(), List.of(FAILED_TO_PROCESS_PAYMENT_REQ_MSG), "Failed to create order");
+            throw new PaymentException(requestId,
+                    HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                    List.of(FAILED_TO_PROCESS_PAYMENT_REQ_MSG),
+                    "Failed to create order");
         }
 
         final var approvalLink = order.getLinks().stream().filter(link -> "approve".equals(link.getRel())).findFirst();
 
         if (approvalLink.isEmpty()) {
             log.error("[{}] Payment order created but no approval link found", requestId);
-            throw new PaymentException(requestId, HttpStatus.INTERNAL_SERVER_ERROR.value(), List.of(FAILED_TO_PROCESS_PAYMENT_REQ_MSG), "Failed to create order");
+            throw new PaymentException(requestId,
+                    HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                    List.of(FAILED_TO_PROCESS_PAYMENT_REQ_MSG),
+                    "Failed to create order");
         }
 
         final var paymentDetails = saveOrderInDatabase(requestId, userId, packId, order);

@@ -13,7 +13,7 @@
 
     <groupId>com.akgarg</groupId>
     <artifactId>UrlShortenerPaymentService</artifactId>
-    <version>1.0.0</version>
+    <version>1.2.0</version>
     <name>Payment Service</name>
     <description>Payment service for UrlShortener</description>
 
@@ -99,6 +99,13 @@
                     <artifactId>spring-boot-starter-logging</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/com.github.ben-manes.caffeine/caffeine -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <version>3.2.0</version>
         </dependency>
 
         <dependency>

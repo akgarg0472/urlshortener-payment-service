@@ -1,4 +1,4 @@
-package com.akgarg.paymentservice.paypal.v1;
+package com.akgarg.paymentservice.v1.paypal;
 
 import com.paypal.sdk.PaypalServerSdkClient;
 import com.paypal.sdk.authentication.ClientCredentialsAuthModel;

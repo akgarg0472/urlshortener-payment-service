@@ -14,7 +14,7 @@ import org.springframework.kafka.core.ProducerFactory;
 import java.util.HashMap;
 
 @Configuration
-@Profile({"prod", "PROD"})
+@Profile("prod")
 public class KafkaConfigs {
 
     @Value(value = "${spring.kafka.bootstrap-servers}")
