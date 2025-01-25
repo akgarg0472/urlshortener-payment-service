@@ -31,10 +31,9 @@ public final class PaymentDetail {
     private Double amount;
 
     @Column(name = "status", nullable = false)
-    @Enumerated(EnumType.STRING)
-    private PaymentStatus paymentStatus;
+    private String paymentStatus;
 
-    @Column(name = "gateway")
+    @Column(name = "gateway", nullable = false)
     private String paymentGateway;
 
     @Column(name = "currency", nullable = false)

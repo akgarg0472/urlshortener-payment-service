@@ -1,4 +1,4 @@
-package com.akgarg.paymentservice.db;
+package com.akgarg.paymentservice.v1.db;
 
 import com.akgarg.paymentservice.payment.PaymentDetail;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,5 +10,7 @@ import java.util.List;
 public interface PaymentDetailRepository extends JpaRepository<PaymentDetail, String> {
 
     List<PaymentDetail> findAllByUserIdAndDeleted(String userId, boolean deleted);
+
+    List<PaymentDetail> findAllByUserIdAndPaymentStatusIn(String userId, List<String> paymentStatuses);
 
 }

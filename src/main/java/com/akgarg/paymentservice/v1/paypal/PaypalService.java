@@ -1,12 +1,13 @@
 package com.akgarg.paymentservice.v1.paypal;
 
-import com.akgarg.paymentservice.db.DatabaseService;
 import com.akgarg.paymentservice.eventpublisher.PaymentEvent;
 import com.akgarg.paymentservice.eventpublisher.PaymentEventPublisher;
 import com.akgarg.paymentservice.exception.PaymentException;
 import com.akgarg.paymentservice.payment.PaymentDetail;
 import com.akgarg.paymentservice.payment.PaymentDetailDto;
 import com.akgarg.paymentservice.payment.PaymentStatus;
+import com.akgarg.paymentservice.v1.db.DatabaseService;
+import com.akgarg.paymentservice.v1.paypal.request.CancelPaymentRequest;
 import com.akgarg.paymentservice.v1.paypal.request.CaptureOrderRequest;
 import com.akgarg.paymentservice.v1.paypal.request.CreateOrderRequest;
 import com.akgarg.paymentservice.v1.paypal.response.CaptureOrderResponse;
@@ -21,10 +22,10 @@ import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -41,66 +42,64 @@ public class PaypalService {
     private final DatabaseService databaseService;
     private final Environment environment;
 
-    public CreateOrderResponse createOrder(final String requestId, final String userId, final CreateOrderRequest request) throws Exception {
+    public CreateOrderResponse createOrder(final String requestId, final CreateOrderRequest request) throws Exception {
         log.info("[{}] Create order request: {}", requestId, request);
-
-        if (userId != null && request.userId() != null && !userId.equals(request.userId())) {
-            log.warn("[{}] User id is not the same as the requested user id", requestId);
-            throw new PaymentException(requestId,
-                    HttpStatus.BAD_REQUEST.value(),
-                    List.of("UserId in header and request body mismatch"),
-                    REQUEST_VALIDATION_FAILED_MSG);
-        }
 
         final var packId = request.packId();
 
-        // check if subscription pack exists
         if (subscriptionCache.getSubscriptionPack(requestId, packId).isEmpty()) {
             log.error("[{}] No subscription plan configured for pack: {}", requestId, packId);
-            return new CreateOrderResponse(
-                    HttpStatus.BAD_REQUEST.value(),
-                    requestId,
-                    REQUEST_VALIDATION_FAILED_MSG,
-                    null,
-                    null,
-                    List.of("Invalid pack id provided: " + packId)
-            );
+            return CreateOrderResponse.builder()
+                    .statusCode(HttpStatus.BAD_REQUEST.value())
+                    .message(FAILED_TO_PROCESS_PAYMENT_REQ_MSG)
+                    .traceId(requestId)
+                    .errors(List.of("Invalid pack id provided: " + packId))
+                    .build();
         }
 
-        // check is user has same or some other pack activated
-        final var activeSubscription = subscriptionCache.getActiveSubscription(requestId, userId);
+        final var activeSubscription = subscriptionCache.getActiveSubscription(requestId, request.userId());
 
         if (activeSubscription.isPresent()) {
             final var subscription = activeSubscription.get();
-
-            // check if same subscription is activated
             if (subscription.packId().equals(packId) && subscription.expiresAt() > System.currentTimeMillis()) {
                 log.error("[{}] Pack {} already activated", requestId, packId);
-                return new CreateOrderResponse(
-                        HttpStatus.CONFLICT.value(),
-                        requestId,
-                        REQUEST_VALIDATION_FAILED_MSG,
-                        null,
-                        null,
-                        List.of("Pack already activated: " + activeSubscription.get().packId())
-                );
+
+                return CreateOrderResponse.builder()
+                        .statusCode(HttpStatus.CONFLICT.value())
+                        .message(REQUEST_VALIDATION_FAILED_MSG)
+                        .traceId(requestId)
+                        .errors(List.of("Pack already activated: " + activeSubscription.get().packId()))
+                        .build();
             }
 
-            // check if current subscription is not default/free one
             final var activeSubscriptionPack = subscriptionCache.getSubscriptionPack(requestId, subscription.packId());
             if (activeSubscriptionPack.isPresent() &&
                     activeSubscriptionPack.get().defaultPack() != Boolean.TRUE &&
                     activeSubscriptionPack.get().price() > 0) {
                 log.error("[{}] Pack with id {} already activated", requestId, subscription.packId());
-                return new CreateOrderResponse(
-                        HttpStatus.CONFLICT.value(),
-                        requestId,
-                        REQUEST_VALIDATION_FAILED_MSG,
-                        null,
-                        null,
-                        List.of("Subscription Pack already activated: " + activeSubscription.get().packId())
-                );
+
+                return CreateOrderResponse.builder()
+                        .statusCode(HttpStatus.CONFLICT.value())
+                        .message(REQUEST_VALIDATION_FAILED_MSG)
+                        .traceId(requestId)
+                        .errors(List.of("You already have one activated subscription pack: " + activeSubscription.get().packId()))
+                        .build();
             }
+        }
+
+        final var incompletePayments = databaseService.getPaymentDetailForUserByPaymentStatus(requestId,
+                request.userId(),
+                List.of(PaymentStatus.CREATED, PaymentStatus.PROCESSING));
+
+        if (!incompletePayments.isEmpty()) {
+            final var ids = incompletePayments.stream().map(PaymentDetail::getId).collect(Collectors.joining(", "));
+            log.info("[{}] Incomplete payment found with id: {}", requestId, ids);
+            return CreateOrderResponse.builder()
+                    .statusCode(HttpStatus.CONFLICT.value())
+                    .message(REQUEST_VALIDATION_FAILED_MSG)
+                    .traceId(requestId)
+                    .errors(List.of("Existing incomplete payment found with id: " + ids))
+                    .build();
         }
 
         final var amount = new AmountWithBreakdown.Builder()
@@ -157,17 +156,17 @@ public class PaypalService {
                     "Failed to create order");
         }
 
-        final var paymentDetails = saveOrderInDatabase(requestId, userId, packId, order);
+        final var paymentDetails = saveOrderInDatabase(requestId, request.userId(), packId, order);
 
         log.info("[{}] Payment order created with id: {}", requestId, paymentDetails.getId());
 
-        return new CreateOrderResponse(
-                HttpStatus.CREATED.value(),
-                requestId,
-                "Payment order created successfully",
-                paymentDetails.getId(),
-                approvalLink.get().getHref(),
-                Collections.emptyList());
+        return CreateOrderResponse.builder()
+                .statusCode(HttpStatus.CREATED.value())
+                .message("Payment order created successfully")
+                .traceId(requestId)
+                .orderId(paymentDetails.getId())
+                .approvalUrl(approvalLink.get().getHref())
+                .build();
     }
 
     public GetOrderResponse getOrderByOrderId(final String requestId, final String orderId) {
@@ -203,12 +202,16 @@ public class PaypalService {
 
         if (paymentDetailOptional.isEmpty()) {
             log.warn("[{}] No payment details found for payment id: {}}", requestId, paymentId);
-            throw new PaymentException("Webhook", HttpStatus.NOT_FOUND.value(), List.of("No payment details found"), "Webhook processing failed");
+            throw new PaymentException(requestId,
+                    HttpStatus.NOT_FOUND.value(),
+                    List.of("No payment found with id: " + paymentId),
+                    "Payment capture failed"
+            );
         }
 
         final var paymentDetail = paymentDetailOptional.get();
 
-        if (paymentDetail.getPaymentStatus() != PaymentStatus.CREATED) {
+        if (!Objects.equals(paymentDetail.getPaymentStatus(), PaymentStatus.CREATED.name())) {
             log.info("[{}] Payment status is {}. Ignoring capture order request", requestId, paymentDetail.getPaymentStatus());
             return new CaptureOrderResponse(
                     "Payment status is %s".formatted(paymentDetail.getPaymentStatus()),
@@ -217,7 +220,7 @@ public class PaypalService {
         }
 
         log.info("[{}] updating payment status to {}", requestId, PaymentStatus.PROCESSING);
-        paymentDetail.setPaymentStatus(PaymentStatus.PROCESSING);
+        paymentDetail.setPaymentStatus(PaymentStatus.PROCESSING.name());
         databaseService.updatePaymentDetails(requestId, paymentDetail);
 
         final var ordersCaptureInput = new OrdersCaptureInput.Builder()
@@ -237,6 +240,27 @@ public class PaypalService {
                 "Payment completed successfully. It may take some time for changes to reflect in your account",
                 HttpStatus.OK.value()
         );
+    }
+
+    public void cancelPayment(final String requestId, final CancelPaymentRequest request) {
+        log.info("[{}] Cancel payment request: {}", requestId, request);
+
+        final var paymentId = request.paymentId();
+        final var paymentDetailOptional = databaseService.getPaymentDetails(requestId, paymentId);
+
+        if (paymentDetailOptional.isEmpty()) {
+            log.warn("[{}] Payment detail not found", requestId);
+            return;
+        }
+
+        if (!paymentDetailOptional.get().getPaymentStatus().equals(PaymentStatus.CANCELLED.name())) {
+            log.info("[{}] Payment is already cancelled", requestId);
+            return;
+        }
+
+        paymentDetailOptional.get().setPaymentStatus(PaymentStatus.CANCELLED.name());
+        databaseService.updatePaymentDetails(requestId, paymentDetailOptional.get());
+        log.info("[{}] Payment cancelled successfully", requestId);
     }
 
     public void processWebhook(final Map<String, Object> requestBody) throws Exception {
@@ -313,14 +337,14 @@ public class PaypalService {
     }
 
     private void completePayment(final String requestId, final String paymentId, final PaymentDetail paymentDetail) {
-        if (paymentDetail.getPaymentStatus() == PaymentStatus.COMPLETED) {
+        if (Objects.equals(paymentDetail.getPaymentStatus(), PaymentStatus.COMPLETED.name())) {
             log.info("[{}] Payment with id {} already marked as {}", requestId, paymentId, PaymentStatus.COMPLETED);
             return;
         }
 
         log.info("[{}] updating payment status to {} for id: {}", requestId, PaymentStatus.COMPLETED, paymentId);
 
-        paymentDetail.setPaymentStatus(PaymentStatus.COMPLETED);
+        paymentDetail.setPaymentStatus(PaymentStatus.COMPLETED.name());
         paymentDetail.setCompletedAt(System.currentTimeMillis());
         final var updatedPaymentDetails = databaseService.updatePaymentDetails(requestId, paymentDetail);
 
@@ -347,7 +371,7 @@ public class PaypalService {
         paymentDetail.setId(order.getId());
         paymentDetail.setUserId(userId);
         paymentDetail.setPackId(packId);
-        paymentDetail.setPaymentStatus(PaymentStatus.CREATED);
+        paymentDetail.setPaymentStatus(PaymentStatus.CREATED.name());
         paymentDetail.setPaymentGateway(PAYMENT_GATEWAY_NAME);
         paymentDetail.setAmount(Double.valueOf(order.getPurchaseUnits().getFirst().getAmount().getValue()));
         paymentDetail.setCurrency(order.getPurchaseUnits().getFirst().getAmount().getCurrencyCode());

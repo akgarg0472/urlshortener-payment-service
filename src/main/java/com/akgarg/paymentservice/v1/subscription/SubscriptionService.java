@@ -21,6 +21,7 @@ import java.util.Optional;
 public class SubscriptionService {
 
     private static final String REQUEST_ID_HEADER = "X-Request-ID";
+    private static final String USER_ID_HEADER = "X-User-ID";
 
     private static final String SUBSCRIPTION_SERVICE_NAME = "urlshortener-subscription-service";
     private static final String SUBSCRIPTION_PACKS_ENDPOINT = "/api/v1/subscriptions/packs";
@@ -85,6 +86,8 @@ public class SubscriptionService {
                             .path(ACTIVE_SUBSCRIPTION_ENDPOINT)
                             .queryParam("userId", userId)
                             .build())
+                    .header(REQUEST_ID_HEADER, requestId)
+                    .header(USER_ID_HEADER, userId)
                     .retrieve()
                     .toEntity(ActiveSubscriptionResponse.class)
                     .getBody();
