@@ -22,6 +22,7 @@ public class PaymentService {
 
         final var paymentDetails = databaseService.getAllPaymentDetails(requestId, userId)
                 .stream()
+                .filter(paymentDetail -> !paymentDetail.isDeleted())
                 .map(PaymentDetailDto::fromPaymentDetail)
                 .sorted(Comparator.comparing(PaymentDetailDto::getCreatedAt))
                 .toList();

@@ -32,16 +32,20 @@ public class PaymentDetailDto {
     @JsonProperty("updated_at")
     private long updatedAt;
 
+    @JsonProperty("completed_at")
+    private long completedAt;
+
     public static PaymentDetailDto fromPaymentDetail(final PaymentDetail paymentDetail) {
         final var paymentDetailDto = new PaymentDetailDto();
         paymentDetailDto.setId(paymentDetail.getId());
         paymentDetailDto.setPackId(paymentDetail.getPackId());
         paymentDetailDto.setAmount(paymentDetail.getAmount());
         paymentDetailDto.setCurrency(paymentDetail.getCurrency());
+        paymentDetailDto.setCreatedAt(paymentDetail.getCreatedAt());
+        paymentDetailDto.setUpdatedAt(paymentDetail.getUpdatedAt());
         paymentDetailDto.setPaymentMethod(paymentDetail.getPaymentMethod());
-        paymentDetailDto.setCreatedAt(paymentDetailDto.getCreatedAt());
-        paymentDetailDto.setUpdatedAt(paymentDetailDto.getUpdatedAt());
         paymentDetailDto.setPaymentStatus(PaymentStatus.valueOf(paymentDetail.getPaymentStatus()));
+        paymentDetailDto.setCompletedAt(paymentDetail.getCompletedAt() != null ? paymentDetail.getCompletedAt() : 0);
         return paymentDetailDto;
     }
 
