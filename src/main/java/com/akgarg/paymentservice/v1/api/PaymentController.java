@@ -2,11 +2,9 @@ package com.akgarg.paymentservice.v1.api;
 
 import com.akgarg.paymentservice.v1.api.response.PaymentHistoryResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
@@ -21,8 +19,18 @@ public class PaymentController {
     @GetMapping("/history")
     public ResponseEntity<PaymentHistoryResponse> getAllPaymentDetails(
             @RequestHeader(REQUEST_ID_HEADER) final String requestId,
-            @RequestHeader(USER_ID_HEADER) final String userId
+            @RequestHeader(USER_ID_HEADER) final String userIdFromHeader,
+            @RequestParam("userId") final String userId
     ) {
+        if (!userIdFromHeader.equals(userId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(PaymentHistoryResponse.builder()
+                            .payments(null)
+                            .message("User is not authorized to view payment history")
+                            .statusCode(HttpStatus.FORBIDDEN.value())
+                            .build());
+        }
+
         final var response = paymentService.getPaymentHistory(requestId, userId);
         return ResponseEntity.status(response.getStatusCode()).body(response);
     }

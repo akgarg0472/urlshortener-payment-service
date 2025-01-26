@@ -47,7 +47,9 @@ public class PaypalService {
 
         final var packId = request.packId();
 
-        if (subscriptionCache.getSubscriptionPack(requestId, packId).isEmpty()) {
+        final var subscriptionPack = subscriptionCache.getSubscriptionPack(requestId, packId);
+
+        if (subscriptionPack.isEmpty()) {
             log.error("[{}] No subscription plan configured for pack: {}", requestId, packId);
             return CreateOrderResponse.builder()
                     .statusCode(HttpStatus.BAD_REQUEST.value())
@@ -99,6 +101,19 @@ public class PaypalService {
                     .message(REQUEST_VALIDATION_FAILED_MSG)
                     .traceId(requestId)
                     .errors(List.of("Existing incomplete payment found with id: " + ids))
+                    .build();
+        }
+
+        if (!subscriptionPack.get().price().equals(request.amount())) {
+            log.warn("[{}] Malicious create order request received. Pack price {}, received price: {}",
+                    requestId,
+                    subscriptionPack.get().price(),
+                    request.amount());
+            return CreateOrderResponse.builder()
+                    .statusCode(HttpStatus.BAD_REQUEST.value())
+                    .traceId(requestId)
+                    .errors(List.of("Invalid amount provided: " + subscriptionPack.get().price()))
+                    .message(FAILED_TO_PROCESS_PAYMENT_REQ_MSG)
                     .build();
         }
 
@@ -375,6 +390,8 @@ public class PaypalService {
         paymentDetail.setPaymentGateway(PAYMENT_GATEWAY_NAME);
         paymentDetail.setAmount(Double.valueOf(order.getPurchaseUnits().getFirst().getAmount().getValue()));
         paymentDetail.setCurrency(order.getPurchaseUnits().getFirst().getAmount().getCurrencyCode());
+        paymentDetail.setCreatedAt(System.currentTimeMillis());
+        paymentDetail.setUpdatedAt(System.currentTimeMillis());
         paymentDetail.setDeleted(false);
         return databaseService.savePaymentDetails(requestId, paymentDetail);
     }
