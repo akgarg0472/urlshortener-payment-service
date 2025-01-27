@@ -1,5 +1,6 @@
 package com.akgarg.paymentservice.v1.api;
 
+import com.akgarg.paymentservice.v1.api.response.PaymentDetailResponse;
 import com.akgarg.paymentservice.v1.api.response.PaymentHistoryResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -15,6 +16,15 @@ public class PaymentController {
     private static final String USER_ID_HEADER = "X-User-ID";
 
     private final PaymentService paymentService;
+
+    @GetMapping("/{paymentId}")
+    public ResponseEntity<PaymentDetailResponse> findPaymentById(
+            @RequestHeader(REQUEST_ID_HEADER) final String requestId,
+            @RequestHeader(USER_ID_HEADER) final String userId,
+            @PathVariable("paymentId") final String paymentId) {
+        final var response = paymentService.getPaymentDetailById(requestId, userId, paymentId);
+        return ResponseEntity.status(response.getStatusCode()).body(response);
+    }
 
     @GetMapping("/history")
     public ResponseEntity<PaymentHistoryResponse> getAllPaymentDetails(
