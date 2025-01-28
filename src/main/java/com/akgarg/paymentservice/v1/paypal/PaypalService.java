@@ -171,7 +171,7 @@ public class PaypalService {
                     "Failed to create order");
         }
 
-        final var paymentDetails = saveOrderInDatabase(requestId, request.userId(), packId, order);
+        final var paymentDetails = saveOrderInDatabase(requestId, request, order);
 
         log.info("[{}] Payment order created with id: {}", requestId, paymentDetails.getId());
 
@@ -375,17 +375,21 @@ public class PaypalService {
                 paymentDetail.getPackId(),
                 paymentDetail.getAmount(),
                 paymentDetail.getCurrency(),
-                paymentDetail.getPaymentGateway()
+                paymentDetail.getPaymentGateway(),
+                paymentDetail.getEmail(),
+                paymentDetail.getName()
         );
         log.info("[{}] Publishing payment success event: {}", webhookId, paymentEvent);
         paymentEventPublisher.publish(paymentEvent);
     }
 
-    private PaymentDetail saveOrderInDatabase(final String requestId, final String userId, final String packId, final Order order) {
+    private PaymentDetail saveOrderInDatabase(final String requestId, final CreateOrderRequest request, final Order order) {
         final var paymentDetail = new PaymentDetail();
         paymentDetail.setId(order.getId());
-        paymentDetail.setUserId(userId);
-        paymentDetail.setPackId(packId);
+        paymentDetail.setUserId(request.userId());
+        paymentDetail.setEmail(request.email());
+        paymentDetail.setName(request.name());
+        paymentDetail.setPackId(request.packId());
         paymentDetail.setPaymentStatus(PaymentStatus.CREATED.name());
         paymentDetail.setPaymentGateway(PAYMENT_GATEWAY_NAME);
         paymentDetail.setAmount(Double.valueOf(order.getPurchaseUnits().getFirst().getAmount().getValue()));

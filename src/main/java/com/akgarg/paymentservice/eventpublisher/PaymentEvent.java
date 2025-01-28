@@ -6,6 +6,8 @@ public record PaymentEvent(
         String packId,
         Double amount,
         String currency,
-        String paymentGateway
+        String paymentGateway,
+        String email,
+        String name
 ) {
 }

@@ -22,7 +22,12 @@ public record CreateOrderRequest(
         @JsonProperty("pack_id") String packId,
 
         @NotBlank(message = "Please provide valid description")
-        @JsonProperty("description") String description
+        @JsonProperty("description") String description,
+
+        @JsonProperty("email") String email,
+
+        @NotBlank(message = "Please provide valid name")
+        @JsonProperty("name") String name
 
 ) {
 }

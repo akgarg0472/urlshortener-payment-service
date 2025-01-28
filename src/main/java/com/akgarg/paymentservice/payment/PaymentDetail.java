@@ -24,6 +24,12 @@ public final class PaymentDetail {
     @Column(name = "user_id", nullable = false)
     private String userId;
 
+    @Column(name = "email")
+    private String email;
+
+    @Column(name = "name")
+    private String name;
+
     @Column(name = "pack_id", nullable = false)
     private String packId;
 
