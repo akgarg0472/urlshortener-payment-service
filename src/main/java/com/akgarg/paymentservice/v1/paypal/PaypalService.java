@@ -10,6 +10,7 @@ import com.akgarg.paymentservice.v1.db.DatabaseService;
 import com.akgarg.paymentservice.v1.paypal.request.CancelPaymentRequest;
 import com.akgarg.paymentservice.v1.paypal.request.CaptureOrderRequest;
 import com.akgarg.paymentservice.v1.paypal.request.CreateOrderRequest;
+import com.akgarg.paymentservice.v1.paypal.response.CancelPaymentResponse;
 import com.akgarg.paymentservice.v1.paypal.response.CaptureOrderResponse;
 import com.akgarg.paymentservice.v1.paypal.response.CreateOrderResponse;
 import com.akgarg.paymentservice.v1.paypal.response.GetOrderResponse;
@@ -257,7 +258,7 @@ public class PaypalService {
         );
     }
 
-    public void cancelPayment(final String requestId, final CancelPaymentRequest request) {
+    public CancelPaymentResponse cancelPayment(final String requestId, final CancelPaymentRequest request) {
         log.info("[{}] Cancel payment request: {}", requestId, request);
 
         final var paymentId = request.paymentId();
@@ -265,17 +266,30 @@ public class PaypalService {
 
         if (paymentDetailOptional.isEmpty()) {
             log.warn("[{}] Payment detail not found", requestId);
-            return;
+            return CancelPaymentResponse.builder()
+                    .success(false)
+                    .statusCode(HttpStatus.NOT_FOUND.value())
+                    .message("Payment detail not found")
+                    .build();
         }
 
-        if (!paymentDetailOptional.get().getPaymentStatus().equals(PaymentStatus.CANCELLED.name())) {
+        if (paymentDetailOptional.get().getPaymentStatus().equals(PaymentStatus.CANCELLED.name())) {
             log.info("[{}] Payment is already cancelled", requestId);
-            return;
+            return CancelPaymentResponse.builder()
+                    .success(false)
+                    .statusCode(HttpStatus.CONFLICT.value())
+                    .message("Payment is already cancelled")
+                    .build();
         }
 
         paymentDetailOptional.get().setPaymentStatus(PaymentStatus.CANCELLED.name());
         databaseService.updatePaymentDetails(requestId, paymentDetailOptional.get());
         log.info("[{}] Payment cancelled successfully", requestId);
+        return CancelPaymentResponse.builder()
+                .success(true)
+                .statusCode(HttpStatus.OK.value())
+                .message("Payment cancelled successfully")
+                .build();
     }
 
     public void processWebhook(final Map<String, Object> requestBody) throws Exception {

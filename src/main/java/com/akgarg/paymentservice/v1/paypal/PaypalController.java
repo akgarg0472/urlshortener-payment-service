@@ -5,6 +5,7 @@ import com.akgarg.paymentservice.utils.ValidationUtils;
 import com.akgarg.paymentservice.v1.paypal.request.CancelPaymentRequest;
 import com.akgarg.paymentservice.v1.paypal.request.CaptureOrderRequest;
 import com.akgarg.paymentservice.v1.paypal.request.CreateOrderRequest;
+import com.akgarg.paymentservice.v1.paypal.response.CancelPaymentResponse;
 import com.akgarg.paymentservice.v1.paypal.response.CaptureOrderResponse;
 import com.akgarg.paymentservice.v1.paypal.response.CreateOrderResponse;
 import com.akgarg.paymentservice.v1.paypal.response.GetOrderResponse;
@@ -60,15 +61,15 @@ public class PaypalController {
     }
 
     @PostMapping(value = "/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<String> deletePayment(
+    public ResponseEntity<CancelPaymentResponse> deletePayment(
             @RequestHeader(REQUEST_ID_HEADER) final String requestId,
             @RequestHeader(USER_ID_HEADER) final String userId,
             @RequestBody final CancelPaymentRequest request,
             final BindingResult validationResult) {
         ValidationUtils.checkAndThrowValidationException(requestId, validationResult);
         validateUserIds(requestId, userId, request.userId());
-        paypalService.cancelPayment(requestId, request);
-        return ResponseEntity.ok("OK");
+        final var response = paypalService.cancelPayment(requestId, request);
+        return ResponseEntity.status(response.getStatusCode()).body(response);
     }
 
     @PostMapping("/webhook")
