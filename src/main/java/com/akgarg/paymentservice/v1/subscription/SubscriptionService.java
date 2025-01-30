@@ -44,6 +44,8 @@ public class SubscriptionService {
             final var applicationPort = environment.getProperty("local.server.port", "null");
             final var requestIdHeader = applicationName + ":" + applicationPort;
 
+            log.info("Subscription endpoint: {}://{}:{}/{}", scheme, host, port, SUBSCRIPTION_PACKS_ENDPOINT);
+
             final var subscriptions = restClientBuilder.build()
                     .get()
                     .uri(uriBuilder -> uriBuilder
@@ -76,6 +78,8 @@ public class SubscriptionService {
             final var scheme = instance.getScheme();
             final var host = instance.getHost();
             final var port = instance.getPort();
+
+            log.info("[{}] Subscription endpoint: {}://{}:{}/{}", requestId, scheme, host, port, ACTIVE_SUBSCRIPTION_ENDPOINT);
 
             final var activeSubscriptionResponse = restClientBuilder.build()
                     .get()
@@ -113,6 +117,8 @@ public class SubscriptionService {
             final var applicationName = environment.getProperty("spring.application.name", "urlshortener-payment-service");
             final var applicationPort = environment.getProperty("local.server.port", "null");
             final var requestIdHeader = applicationName + ":" + applicationPort;
+
+            log.info("[{}] Subscription endpoint: {}://{}:{}", requestId, scheme, host, port);
 
             final var subscriptionPack = restClientBuilder.build()
                     .get()
