@@ -44,7 +44,7 @@ public class SubscriptionService {
             final var applicationPort = environment.getProperty("local.server.port", "null");
             final var requestIdHeader = applicationName + ":" + applicationPort;
 
-            log.info("Subscription endpoint: {}://{}:{}/{}", scheme, host, port, SUBSCRIPTION_PACKS_ENDPOINT);
+            log.info("Subscription endpoint for subscription packs: {}://{}:{}/{}", scheme, host, port, SUBSCRIPTION_PACKS_ENDPOINT);
 
             final var subscriptions = restClientBuilder.build()
                     .get()
@@ -105,7 +105,7 @@ public class SubscriptionService {
     }
 
     public Optional<SubscriptionPack> getSubscriptionPack(final String requestId, final String packId) {
-        log.info("[{}] Getting subscription pack {}", requestId, packId);
+        log.info("[{}] Getting subscription pack: {}", requestId, packId);
 
         final var instances = discoveryClient.getInstances(SUBSCRIPTION_SERVICE_NAME);
 
@@ -118,7 +118,7 @@ public class SubscriptionService {
             final var applicationPort = environment.getProperty("local.server.port", "null");
             final var requestIdHeader = applicationName + ":" + applicationPort;
 
-            log.info("[{}] Subscription endpoint: {}://{}:{}", requestId, scheme, host, port);
+            log.info("[{}] Subscription endpoint for get pack: {}://{}:{}/{}/{}", requestId, scheme, host, port, SUBSCRIPTION_PACKS_ENDPOINT, packId);
 
             final var subscriptionPack = restClientBuilder.build()
                     .get()
