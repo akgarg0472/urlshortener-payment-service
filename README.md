@@ -1,7 +1,7 @@
 # URL Shortener Payment Service
 
 ![Java Version](https://img.shields.io/badge/Java-21-blue)
-![version](https://img.shields.io/badge/version-1.5.1-blue)
+![version](https://img.shields.io/badge/version-1.5.2-blue)
 
 ## Introduction
 

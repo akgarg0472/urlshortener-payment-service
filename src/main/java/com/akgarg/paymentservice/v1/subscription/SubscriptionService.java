@@ -136,7 +136,8 @@ public class SubscriptionService {
                         final var uri = uriBuilder.scheme(scheme)
                                 .host(host)
                                 .port(port)
-                                .pathSegment(SUBSCRIPTION_PACKS_ENDPOINT, packId)
+                                .path(SUBSCRIPTION_PACKS_ENDPOINT.replaceAll("/+$", "") + "/")
+                                .path(packId)
                                 .build();
                         log.info("[{}] Subscription endpoint for get pack: {}", requestId, uri);
                         return uri;
