@@ -35,6 +35,10 @@ public class SubscriptionService {
         log.info("Getting all subscription packs");
         final var instances = discoveryClient.getInstances(SUBSCRIPTION_SERVICE_NAME);
 
+        if (instances.isEmpty()) {
+            log.warn("No subscription service instances found");
+        }
+
         for (final var instance : instances) {
             final var scheme = instance.getScheme();
             final var host = instance.getHost();
@@ -44,18 +48,20 @@ public class SubscriptionService {
             final var applicationPort = environment.getProperty("local.server.port", "null");
             final var requestIdHeader = applicationName + ":" + applicationPort;
 
-            log.info("Subscription endpoint for subscription packs: {}://{}:{}/{}", scheme, host, port, SUBSCRIPTION_PACKS_ENDPOINT);
-
             final var subscriptions = restClientBuilder.build()
                     .get()
-                    .uri(uriBuilder -> uriBuilder
-                            .scheme(scheme)
-                            .host(host)
-                            .port(port)
-                            .path(SUBSCRIPTION_PACKS_ENDPOINT)
-                            .queryParam("page", 0)
-                            .queryParam("limit", 1000)
-                            .build())
+                    .uri(uriBuilder -> {
+                        final var uri = uriBuilder
+                                .scheme(scheme)
+                                .host(host)
+                                .port(port)
+                                .path(SUBSCRIPTION_PACKS_ENDPOINT)
+                                .queryParam("page", 0)
+                                .queryParam("limit", 1000)
+                                .build();
+                        log.info("Subscription endpoint for subscription packs: {}", uri);
+                        return uri;
+                    })
                     .header(REQUEST_ID_HEADER, requestIdHeader)
                     .retrieve()
                     .toEntity(SubscriptionPacksResponse.class)
@@ -74,22 +80,28 @@ public class SubscriptionService {
 
         final var subsServiceInstances = discoveryClient.getInstances(SUBSCRIPTION_SERVICE_NAME);
 
+        if (subsServiceInstances.isEmpty()) {
+            log.warn("[{}] No subscription service instances found", requestId);
+        }
+
         for (final var instance : subsServiceInstances) {
             final var scheme = instance.getScheme();
             final var host = instance.getHost();
             final var port = instance.getPort();
 
-            log.info("[{}] Subscription endpoint: {}://{}:{}/{}", requestId, scheme, host, port, ACTIVE_SUBSCRIPTION_ENDPOINT);
-
             final var activeSubscriptionResponse = restClientBuilder.build()
                     .get()
-                    .uri(uriBuilder -> uriBuilder
-                            .scheme(scheme)
-                            .host(host)
-                            .port(port)
-                            .path(ACTIVE_SUBSCRIPTION_ENDPOINT)
-                            .queryParam("userId", userId)
-                            .build())
+                    .uri(uriBuilder -> {
+                        final var uri = uriBuilder
+                                .scheme(scheme)
+                                .host(host)
+                                .port(port)
+                                .path(ACTIVE_SUBSCRIPTION_ENDPOINT)
+                                .queryParam("userId", userId)
+                                .build();
+                        log.info("[{}] Subscription endpoint for active subscription: {}", requestId, uri);
+                        return uri;
+                    })
                     .header(REQUEST_ID_HEADER, requestId)
                     .header(USER_ID_HEADER, userId)
                     .retrieve()
@@ -109,26 +121,27 @@ public class SubscriptionService {
 
         final var instances = discoveryClient.getInstances(SUBSCRIPTION_SERVICE_NAME);
 
+        if (instances.isEmpty()) {
+            log.warn("[{}] No subscription service instances found", requestId);
+        }
+
         for (final var instance : instances) {
             final var scheme = instance.getScheme();
             final var host = instance.getHost();
             final var port = instance.getPort();
 
-            final var applicationName = environment.getProperty("spring.application.name", "urlshortener-payment-service");
-            final var applicationPort = environment.getProperty("local.server.port", "null");
-            final var requestIdHeader = applicationName + ":" + applicationPort;
-
-            log.info("[{}] Subscription endpoint for get pack: {}://{}:{}/{}/{}", requestId, scheme, host, port, SUBSCRIPTION_PACKS_ENDPOINT, packId);
-
             final var subscriptionPack = restClientBuilder.build()
                     .get()
-                    .uri(uriBuilder -> uriBuilder
-                            .scheme(scheme)
-                            .host(host)
-                            .port(port)
-                            .pathSegment(SUBSCRIPTION_PACKS_ENDPOINT, packId)
-                            .build())
-                    .header(REQUEST_ID_HEADER, requestIdHeader)
+                    .uri(uriBuilder -> {
+                        final var uri = uriBuilder.scheme(scheme)
+                                .host(host)
+                                .port(port)
+                                .pathSegment(SUBSCRIPTION_PACKS_ENDPOINT, packId)
+                                .build();
+                        log.info("[{}] Subscription endpoint for get pack: {}", requestId, uri);
+                        return uri;
+                    })
+                    .header(REQUEST_ID_HEADER, requestId)
                     .retrieve()
                     .toEntity(SubscriptionPackResponse.class)
                     .getBody();
