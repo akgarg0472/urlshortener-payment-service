@@ -40,21 +40,18 @@ public class SubscriptionService {
         }
 
         for (final var instance : instances) {
-            final var scheme = instance.getScheme();
-            final var host = instance.getHost();
-            final var port = instance.getPort();
-
             final var applicationName = environment.getProperty("spring.application.name", "urlshortener-payment-service");
             final var applicationPort = environment.getProperty("local.server.port", "null");
             final var requestIdHeader = applicationName + ":" + applicationPort;
+            final var instanceUri = instance.getUri();
 
             final var subscriptions = restClientBuilder.build()
                     .get()
                     .uri(uriBuilder -> {
                         final var uri = uriBuilder
-                                .scheme(scheme)
-                                .host(host)
-                                .port(port)
+                                .scheme(instanceUri.getScheme())
+                                .host(instanceUri.getHost())
+                                .port(instanceUri.getPort())
                                 .path(SUBSCRIPTION_PACKS_ENDPOINT)
                                 .queryParam("page", 0)
                                 .queryParam("limit", 1000)
