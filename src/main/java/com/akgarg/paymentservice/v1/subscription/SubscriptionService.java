@@ -82,17 +82,15 @@ public class SubscriptionService {
         }
 
         for (final var instance : subsServiceInstances) {
-            final var scheme = instance.getScheme();
-            final var host = instance.getHost();
-            final var port = instance.getPort();
+            final var instanceUri = instance.getUri();
 
             final var activeSubscriptionResponse = restClientBuilder.build()
                     .get()
                     .uri(uriBuilder -> {
                         final var uri = uriBuilder
-                                .scheme(scheme)
-                                .host(host)
-                                .port(port)
+                                .scheme(instanceUri.getScheme())
+                                .host(instanceUri.getHost())
+                                .port(instanceUri.getPort())
                                 .path(ACTIVE_SUBSCRIPTION_ENDPOINT)
                                 .queryParam("userId", userId)
                                 .build();
@@ -123,16 +121,14 @@ public class SubscriptionService {
         }
 
         for (final var instance : instances) {
-            final var scheme = instance.getScheme();
-            final var host = instance.getHost();
-            final var port = instance.getPort();
+            final var instanceUri = instance.getUri();
 
             final var subscriptionPack = restClientBuilder.build()
                     .get()
                     .uri(uriBuilder -> {
-                        final var uri = uriBuilder.scheme(scheme)
-                                .host(host)
-                                .port(port)
+                        final var uri = uriBuilder.scheme(instance.getScheme())
+                                .host(instanceUri.getHost())
+                                .port(instanceUri.getPort())
                                 .path(SUBSCRIPTION_PACKS_ENDPOINT.replaceAll("/+$", "") + "/")
                                 .path(packId)
                                 .build();
