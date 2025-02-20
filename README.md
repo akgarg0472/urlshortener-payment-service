@@ -1,7 +1,7 @@
 # URL Shortener Payment Service
 
 ![Java Version](https://img.shields.io/badge/Java-21-blue)
-![version](https://img.shields.io/badge/version-1.6.1-blue)
+![version](https://img.shields.io/badge/version-1.7.0-blue)
 
 ## Introduction
 
@@ -171,6 +171,40 @@ paypal:
   **'Sandbox'**.
 - **paypal.oauth.client-id**: The client ID for OAuth authentication with PayPal.
 - **paypal.oauth.client-secret**: The client secret for OAuth authentication with PayPal.
+
+### Logging Configuration
+
+The URL Shortener Service uses environment variables for logging configuration. Below are the available environment
+variables that you can customize:
+
+- **LOGGING_CONSOLE_ENABLED**: Enables or disables console-based logging.
+    - Default value: `false`
+    - Allowed values: `true`, `false`
+
+- **LOGGING_FILE_ENABLED**: Enables or disables file-based logging.
+    - Default value: `false`
+    - Allowed values: `true`, `false`
+
+- **LOGGING_FILE_BASE_PATH**: Specifies the base path for log files.
+    - Default value: `/tmp`
+
+- **LOGGING_LEVEL**: Specifies the log level for the application.
+    - Default value: `INFO`
+    - Allowed values: `DEBUG`, `INFO`, `WARN`, `ERROR`
+
+- **LOGGING_STREAM_ENABLED**: Enables or disables streaming logs.
+    - Default value: `false`
+    - Allowed values: `true`, `false`
+
+- **LOGGING_STREAM_HOST**: Specifies the host for streaming logs.
+    - Default value: `localhost`
+
+- **LOGGING_STREAM_PORT**: Specifies the port for streaming logs.
+    - Default value: `5000`
+
+- **LOGGING_STREAM_PROTOCOL**: Specifies the protocol used for log streaming.
+    - Default value: `TCP`
+    - Allowed values: `TCP`, `UDP`
 
 ## Docker Setup
 
