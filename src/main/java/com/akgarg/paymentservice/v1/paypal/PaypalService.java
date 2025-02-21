@@ -28,8 +28,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-@Service
+@SuppressWarnings("LoggingSimilarMessage")
 @Slf4j
+@Service
 @RequiredArgsConstructor
 public class PaypalService {
 
@@ -43,77 +44,71 @@ public class PaypalService {
     private final DatabaseService databaseService;
     private final Environment environment;
 
-    public CreateOrderResponse createOrder(final String requestId, final CreateOrderRequest request) throws Exception {
-        log.info("[{}] Create order request: {}", requestId, request);
+    public CreateOrderResponse createOrder(final CreateOrderRequest request) throws Exception {
+        log.info("Received create order request {}", request);
 
         final var packId = request.packId();
 
-        final var subscriptionPack = subscriptionCache.getSubscriptionPack(requestId, packId);
+        final var subscriptionPack = subscriptionCache.getSubscriptionPack(packId);
 
         if (subscriptionPack.isEmpty()) {
-            log.error("[{}] No subscription plan configured for pack: {}", requestId, packId);
+            log.error("No subscription plan configured for pack {}", packId);
             return CreateOrderResponse.builder()
                     .statusCode(HttpStatus.BAD_REQUEST.value())
                     .message(FAILED_TO_PROCESS_PAYMENT_REQ_MSG)
-                    .traceId(requestId)
-                    .errors(List.of("Invalid pack id provided: " + packId))
+                    .errors(List.of("Invalid pack id provided"))
                     .build();
         }
 
-        final var activeSubscription = subscriptionCache.getActiveSubscription(requestId, request.userId());
+        final var activeSubscription = subscriptionCache.getActiveSubscription(request.userId());
 
         if (activeSubscription.isPresent()) {
             final var subscription = activeSubscription.get();
-            if (subscription.packId().equals(packId) && subscription.expiresAt() > System.currentTimeMillis()) {
-                log.error("[{}] Pack {} already activated", requestId, packId);
 
+            if (subscription.packId().equals(packId) && subscription.expiresAt() > System.currentTimeMillis()) {
+                log.info("Pack {} is already activated for user", packId);
                 return CreateOrderResponse.builder()
                         .statusCode(HttpStatus.CONFLICT.value())
                         .message(REQUEST_VALIDATION_FAILED_MSG)
-                        .traceId(requestId)
-                        .errors(List.of("Pack already activated: " + activeSubscription.get().packId()))
+                        .errors(List.of("Pack already activated"))
                         .build();
             }
 
-            final var activeSubscriptionPack = subscriptionCache.getSubscriptionPack(requestId, subscription.packId());
+            final var activeSubscriptionPack = subscriptionCache.getSubscriptionPack(subscription.packId());
+
             if (activeSubscriptionPack.isPresent() &&
                     activeSubscriptionPack.get().defaultPack() != Boolean.TRUE &&
                     activeSubscriptionPack.get().price() > 0) {
-                log.error("[{}] Pack with id {} already activated", requestId, subscription.packId());
+                log.info("Pack with id {} already activated", subscription.packId());
 
                 return CreateOrderResponse.builder()
                         .statusCode(HttpStatus.CONFLICT.value())
                         .message(REQUEST_VALIDATION_FAILED_MSG)
-                        .traceId(requestId)
-                        .errors(List.of("You already have one activated subscription pack: " + activeSubscription.get().packId()))
+                        .errors(List.of("You already have one activated subscription pack with id " + activeSubscription.get().packId()))
                         .build();
             }
         }
 
-        final var incompletePayments = databaseService.getPaymentDetailForUserByPaymentStatus(requestId,
-                request.userId(),
+        final var incompletePayments = databaseService.getPaymentDetailForUserByPaymentStatus(request.userId(),
                 List.of(PaymentStatus.CREATED, PaymentStatus.PROCESSING));
 
         if (!incompletePayments.isEmpty()) {
             final var ids = incompletePayments.stream().map(PaymentDetail::getId).collect(Collectors.joining(", "));
-            log.info("[{}] Incomplete payment found with id: {}", requestId, ids);
+            log.info("Incomplete payment found with id {}", ids);
             return CreateOrderResponse.builder()
                     .statusCode(HttpStatus.CONFLICT.value())
                     .message(REQUEST_VALIDATION_FAILED_MSG)
-                    .traceId(requestId)
                     .errors(List.of("Existing incomplete payment found with id: " + ids))
                     .build();
         }
 
         if (!subscriptionPack.get().price().equals(request.amount())) {
-            log.warn("[{}] Malicious create order request received. Pack price {}, received price: {}",
-                    requestId,
+            log.warn("Malicious create order request received. Pack price {}, received price: {}",
                     subscriptionPack.get().price(),
                     request.amount());
             return CreateOrderResponse.builder()
                     .statusCode(HttpStatus.BAD_REQUEST.value())
-                    .traceId(requestId)
-                    .errors(List.of("Invalid amount provided: " + subscriptionPack.get().price()))
+                    .errors(List.of("Invalid amount provided"))
                     .message(FAILED_TO_PROCESS_PAYMENT_REQ_MSG)
                     .build();
         }
@@ -152,11 +147,25 @@ public class PaypalService {
         final var orderApiResponse = paypalClient.getOrdersController().ordersCreate(ordersCreateInput);
         final var order = orderApiResponse.getResult();
 
-        log.info("[{}] Payment order created: {}", requestId, order);
+        if (order == null) {
+            log.info("Failed to create order because null received for create order API");
+            return CreateOrderResponse.builder()
+                    .statusCode(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                    .errors(List.of("Invalid response received from payment gateway"))
+                    .message(FAILED_TO_PROCESS_PAYMENT_REQ_MSG)
+                    .build();
+        }
+
+        log.info("Payment order created with id {}", order.getId());
+
+        if (log.isDebugEnabled()) {
+            log.debug("Created order: {}", order);
+        }
 
         if (order.getPurchaseUnits().size() != 1) {
-            log.error("[{}] Payment order does not have valid purchase units", requestId);
-            throw new PaymentException(requestId,
+            log.info("Payment order does not have valid purchase units");
+
+            throw new PaymentException(
                     HttpStatus.INTERNAL_SERVER_ERROR.value(),
                     List.of(FAILED_TO_PROCESS_PAYMENT_REQ_MSG),
                     "Failed to create order");
@@ -165,60 +174,57 @@ public class PaypalService {
         final var approvalLink = order.getLinks().stream().filter(link -> "approve".equals(link.getRel())).findFirst();
 
         if (approvalLink.isEmpty()) {
-            log.error("[{}] Payment order created but no approval link found", requestId);
-            throw new PaymentException(requestId,
+            log.warn("Payment order created but no approval link found");
+            throw new PaymentException(
                     HttpStatus.INTERNAL_SERVER_ERROR.value(),
                     List.of(FAILED_TO_PROCESS_PAYMENT_REQ_MSG),
                     "Failed to create order");
         }
 
-        final var paymentDetails = saveOrderInDatabase(requestId, request, order);
+        final var paymentDetails = saveOrderInDatabase(request, order);
 
-        log.info("[{}] Payment order created with id: {}", requestId, paymentDetails.getId());
+        log.info("Payment order created with id {}", paymentDetails.getId());
 
         return CreateOrderResponse.builder()
                 .statusCode(HttpStatus.CREATED.value())
                 .message("Payment order created successfully")
-                .traceId(requestId)
                 .orderId(paymentDetails.getId())
                 .approvalUrl(approvalLink.get().getHref())
                 .build();
     }
 
-    public GetOrderResponse getOrderByOrderId(final String requestId, final String orderId) {
-        log.info("[{}] Get order request: {}", requestId, orderId);
+    public GetOrderResponse getOrderByOrderId(final String orderId) {
+        log.info("Received request to get order for id {}", orderId);
 
-        final var paymentDetailOptional = databaseService.getPaymentDetails(requestId, orderId);
+        final var paymentDetailOptional = databaseService.getPaymentDetails(orderId);
 
         if (paymentDetailOptional.isEmpty()) {
-            log.error("[{}] Payment order not found", requestId);
-            return new GetOrderResponse(
-                    HttpStatus.BAD_REQUEST.value(),
-                    requestId,
-                    "No payment order found with id: " + orderId,
-                    null
-            );
+            log.info("Payment order not found for id {}", orderId);
+
+            return GetOrderResponse.builder()
+                    .statusCode(HttpStatus.BAD_REQUEST.value())
+                    .message("No payment order found for id " + orderId)
+                    .build();
         }
 
         final var paymentDetailDto = PaymentDetailDto.fromPaymentDetail(paymentDetailOptional.get());
 
-        return new GetOrderResponse(
-                HttpStatus.OK.value(),
-                requestId,
-                "Payment order fetched successfully",
-                paymentDetailDto
-        );
+        return GetOrderResponse.builder()
+                .statusCode(HttpStatus.OK.value())
+                .message("Payment order fetched successfully")
+                .paymentDetail(paymentDetailDto)
+                .build();
     }
 
-    public CaptureOrderResponse captureOrder(final String requestId, final CaptureOrderRequest request) throws Exception {
-        log.info("[{}] Capture order request: {}", requestId, request);
+    public CaptureOrderResponse captureOrder(final CaptureOrderRequest request) throws Exception {
+        log.info("Capture order request: {}", request);
 
         final var paymentId = request.paymentId();
-        final var paymentDetailOptional = databaseService.getPaymentDetails(requestId, paymentId);
+        final var paymentDetailOptional = databaseService.getPaymentDetails(paymentId);
 
         if (paymentDetailOptional.isEmpty()) {
-            log.warn("[{}] No payment details found for payment id: {}}", requestId, paymentId);
-            throw new PaymentException(requestId,
+            log.warn("No payment details found for payment id {}", paymentId);
+            throw new PaymentException(
                     HttpStatus.NOT_FOUND.value(),
                     List.of("No payment found with id: " + paymentId),
                     "Payment capture failed"
@@ -228,63 +234,65 @@ public class PaypalService {
         final var paymentDetail = paymentDetailOptional.get();
 
         if (!Objects.equals(paymentDetail.getPaymentStatus(), PaymentStatus.CREATED.name())) {
-            log.info("[{}] Payment status is {}. Ignoring capture order request", requestId, paymentDetail.getPaymentStatus());
+            log.info("Payment status is {}. Ignoring capture order request", paymentDetail.getPaymentStatus());
             return new CaptureOrderResponse(
                     "Payment status is %s".formatted(paymentDetail.getPaymentStatus()),
                     HttpStatus.OK.value()
             );
         }
 
-        log.info("[{}] updating payment status to {}", requestId, PaymentStatus.PROCESSING);
+        log.info("Updating payment status to {}", PaymentStatus.PROCESSING);
         paymentDetail.setPaymentStatus(PaymentStatus.PROCESSING.name());
-        databaseService.updatePaymentDetails(requestId, paymentDetail);
+        databaseService.updatePaymentDetails(paymentDetail);
 
         final var ordersCaptureInput = new OrdersCaptureInput.Builder()
                 .id(paymentId)
                 .prefer("return=minimal")
                 .build();
 
-        log.info("[{}] Sending order capture request: {}", requestId, ordersCaptureInput);
+        log.info("Sending order capture request: {}", ordersCaptureInput);
         final var orderCaptureResponse = paypalClient.getOrdersController().ordersCapture(ordersCaptureInput);
-        log.info("[{}] Order capture response status {} with code {}", requestId, orderCaptureResponse.getResult().getStatus(), orderCaptureResponse.getStatusCode());
+        log.info("Order capture response status {} with code {}", orderCaptureResponse.getResult().getStatus(), orderCaptureResponse.getStatusCode());
 
         if (orderCaptureResponse.getStatusCode() == HttpStatus.CREATED.value() && orderCaptureResponse.getResult().getStatus() == OrderStatus.COMPLETED) {
-            completePayment(requestId, paymentId, paymentDetail);
+            completePayment(paymentId, paymentDetail);
         }
 
         return new CaptureOrderResponse(
-                "Payment completed successfully. It may take some time for changes to reflect in your account",
+                "Your payment has been successfully processed. Please allow some time for the changes to be reflected in your account.",
                 HttpStatus.OK.value()
         );
     }
 
-    public CancelPaymentResponse cancelPayment(final String requestId, final CancelPaymentRequest request) {
-        log.info("[{}] Cancel payment request: {}", requestId, request);
+    public CancelPaymentResponse cancelPayment(final CancelPaymentRequest request) {
+        log.info("Received Cancel payment request {}", request);
 
         final var paymentId = request.paymentId();
-        final var paymentDetailOptional = databaseService.getPaymentDetails(requestId, paymentId);
+        final var paymentDetailOptional = databaseService.getPaymentDetails(paymentId);
 
         if (paymentDetailOptional.isEmpty()) {
-            log.warn("[{}] Payment detail not found", requestId);
+            log.warn("Payment detail not found for payment Id {}", request.paymentId());
             return CancelPaymentResponse.builder()
                     .success(false)
                     .statusCode(HttpStatus.NOT_FOUND.value())
-                    .message("Payment detail not found")
+                    .message("Payment detail not found for requested id")
                     .build();
         }
 
         if (paymentDetailOptional.get().getPaymentStatus().equals(PaymentStatus.CANCELLED.name())) {
-            log.info("[{}] Payment is already cancelled", requestId);
+            log.info("Payment is already cancelled");
             return CancelPaymentResponse.builder()
                     .success(false)
-                    .statusCode(HttpStatus.CONFLICT.value())
+                    .statusCode(HttpStatus.OK.value())
                     .message("Payment is already cancelled")
                     .build();
         }
 
         paymentDetailOptional.get().setPaymentStatus(PaymentStatus.CANCELLED.name());
-        databaseService.updatePaymentDetails(requestId, paymentDetailOptional.get());
-        log.info("[{}] Payment cancelled successfully", requestId);
+        databaseService.updatePaymentDetails(paymentDetailOptional.get());
+
+        log.info("Payment cancelled successfully");
+
         return CancelPaymentResponse.builder()
                 .success(true)
                 .statusCode(HttpStatus.OK.value())
@@ -293,24 +301,27 @@ public class PaypalService {
     }
 
     public void processWebhook(final Map<String, Object> requestBody) throws Exception {
-        log.info("Paypal Webhook request: {}", requestBody);
+        if (log.isDebugEnabled()) {
+            log.debug("Paypal Webhook request: {}", requestBody);
+        }
+
         final var eventType = PaypalWebhookEventType.fromValue(requestBody.get("event_type").toString());
 
         if (eventType.isEmpty()) {
-            log.info("Not processing webhook request for event: {}", requestBody.get("event_type"));
+            log.info("Not processing webhook request for event {}", requestBody.get("event_type"));
             return;
         }
 
         switch (eventType.get()) {
             case ORDER_APPROVED -> handleOrderApprovedWebhook(requestBody);
             case PAYMENT_CAPTURE_COMPLETE -> handlePaymentCaptureCompleteWebhook(requestBody);
-            default -> log.warn("Unsupported event type: {}", eventType);
+            default -> log.info("Unsupported paypal webhook event type {}", eventType);
         }
     }
 
     private void handleOrderApprovedWebhook(final Map<String, Object> requestBody) throws Exception {
         final var webhookId = requestBody.get("id").toString();
-        log.info("[{}] Processing Paypal Webhook {} request", webhookId, PaypalWebhookEventType.ORDER_APPROVED);
+        log.info("Processing {} Paypal Webhook request for webhook id {}", PaypalWebhookEventType.ORDER_APPROVED, webhookId);
 
         final String paymentId;
         final Map<?, ?> resourceMap;
@@ -319,7 +330,10 @@ public class PaypalService {
             resourceMap = mp;
             paymentId = resourceMap.get("id").toString();
         } else {
-            throw new PaymentException(webhookId, HttpStatus.BAD_REQUEST.value(), List.of("Failed to extract order Id"), FAILED_TO_PROCESS_PAYMENT_REQ_MSG);
+            throw new PaymentException(HttpStatus.BAD_REQUEST.value(),
+                    List.of("Failed to extract order Id"),
+                    FAILED_TO_PROCESS_PAYMENT_REQ_MSG
+            );
         }
 
         final var payer = resourceMap.get("payer");
@@ -337,12 +351,12 @@ public class PaypalService {
                 payerId
         );
 
-        captureOrder(webhookId, request);
+        captureOrder(request);
     }
 
     private void handlePaymentCaptureCompleteWebhook(final Map<String, Object> requestBody) {
         final var webhookId = requestBody.get("id").toString();
-        log.info("[{}] Processing Paypal Webhook {} request", webhookId, PaypalWebhookEventType.PAYMENT_CAPTURE_COMPLETE);
+        log.info("Processing {} Paypal Webhook request for webhook id {}", PaypalWebhookEventType.PAYMENT_CAPTURE_COMPLETE, webhookId);
 
         final String paymentId;
 
@@ -351,38 +365,39 @@ public class PaypalService {
                 supplementaryData.get("related_ids") instanceof Map<?, ?> relatedIds) {
             paymentId = relatedIds.get("order_id").toString();
         } else {
-            log.error("[{}] Failed to extract order id from webhook body", webhookId);
-            throw new PaymentException(webhookId, HttpStatus.BAD_REQUEST.value(), List.of("Failed to extract order Id"), FAILED_TO_PROCESS_PAYMENT_REQ_MSG);
+            log.error("Failed to extract order id from webhook body");
+            throw new PaymentException(HttpStatus.BAD_REQUEST.value(), List.of("Failed to extract order Id"), FAILED_TO_PROCESS_PAYMENT_REQ_MSG);
         }
 
-        final var paymentDetailOptional = databaseService.getPaymentDetails(webhookId, paymentId);
+        final var paymentDetailOptional = databaseService.getPaymentDetails(paymentId);
 
         if (paymentDetailOptional.isEmpty()) {
-            log.warn("[{}] No payment details found for payment id: {}}", webhookId, paymentId);
-            throw new PaymentException("Webhook", HttpStatus.NOT_FOUND.value(), List.of("No payment details found"), "Webhook processing failed");
+            log.warn("No payment details found for payment id {}", paymentId);
+            throw new PaymentException(HttpStatus.NOT_FOUND.value(), List.of("No payment details found"), "Webhook processing failed");
         }
 
-        completePayment(webhookId, paymentId, paymentDetailOptional.get());
+        completePayment(paymentId, paymentDetailOptional.get());
     }
 
-    private void completePayment(final String requestId, final String paymentId, final PaymentDetail paymentDetail) {
+    private void completePayment(final String paymentId, final PaymentDetail paymentDetail) {
         if (Objects.equals(paymentDetail.getPaymentStatus(), PaymentStatus.COMPLETED.name())) {
-            log.info("[{}] Payment with id {} already marked as {}", requestId, paymentId, PaymentStatus.COMPLETED);
+            log.info("Payment with id {} already marked as {}", paymentId, PaymentStatus.COMPLETED);
             return;
         }
 
-        log.info("[{}] updating payment status to {} for id: {}", requestId, PaymentStatus.COMPLETED, paymentId);
+        log.info("updating payment status to {} for id: {}", PaymentStatus.COMPLETED, paymentId);
 
         paymentDetail.setPaymentStatus(PaymentStatus.COMPLETED.name());
         paymentDetail.setCompletedAt(System.currentTimeMillis());
-        final var updatedPaymentDetails = databaseService.updatePaymentDetails(requestId, paymentDetail);
 
-        log.info("[{}] Payment status updated successfully to {} for id: {}", requestId, updatedPaymentDetails.getPaymentStatus(), updatedPaymentDetails.getId());
+        final var updatedPaymentDetails = databaseService.updatePaymentDetails(paymentDetail);
 
-        publishPaymentSuccessEvent(requestId, updatedPaymentDetails);
+        log.info("Payment status updated successfully to {} for id: {}", updatedPaymentDetails.getPaymentStatus(), updatedPaymentDetails.getId());
+
+        publishPaymentSuccessEvent(updatedPaymentDetails);
     }
 
-    private void publishPaymentSuccessEvent(final String webhookId, final PaymentDetail paymentDetail) {
+    private void publishPaymentSuccessEvent(final PaymentDetail paymentDetail) {
         final var paymentEvent = new PaymentEvent(
                 paymentDetail.getId(),
                 paymentDetail.getUserId(),
@@ -393,11 +408,10 @@ public class PaypalService {
                 paymentDetail.getEmail(),
                 paymentDetail.getName()
         );
-        log.info("[{}] Publishing payment success event: {}", webhookId, paymentEvent);
-        paymentEventPublisher.publish(paymentEvent);
+        paymentEventPublisher.publishPaymentSuccess(paymentEvent);
     }
 
-    private PaymentDetail saveOrderInDatabase(final String requestId, final CreateOrderRequest request, final Order order) {
+    private PaymentDetail saveOrderInDatabase(final CreateOrderRequest request, final Order order) {
         final var paymentDetail = new PaymentDetail();
         paymentDetail.setId(order.getId());
         paymentDetail.setUserId(request.userId());
@@ -411,7 +425,7 @@ public class PaypalService {
         paymentDetail.setCreatedAt(System.currentTimeMillis());
         paymentDetail.setUpdatedAt(System.currentTimeMillis());
         paymentDetail.setDeleted(false);
-        return databaseService.savePaymentDetails(requestId, paymentDetail);
+        return databaseService.savePaymentDetails(paymentDetail);
     }
 
 }

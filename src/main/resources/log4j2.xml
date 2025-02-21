@@ -32,8 +32,8 @@
         <Routing name="FileRouter">
             <Routes pattern="${enableFileLogging}">
                 <Route key="true">
-                    <RollingFile name="RollingFile" fileName="${loggingFileBasePath}/urlshortener-service.log"
-                                 filePattern="${loggingFileBasePath}/urlshortener-service_%d{yyyy-MM-dd-HH}.log.gz">
+                    <RollingFile name="RollingFile" fileName="${loggingFileBasePath}/urlshortener-payment-service.log"
+                                 filePattern="${loggingFileBasePath}/urlshortener-payment-service_%d{yyyy-MM-dd-HH}.log.gz">
                         <JsonTemplateLayout eventTemplateUri="classpath:JsonTemplateLayout.json"
                                             stackTraceEnabled="true"/>
                         <Policies>

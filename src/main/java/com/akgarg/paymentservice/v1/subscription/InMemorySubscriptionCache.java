@@ -16,20 +16,20 @@ public class InMemorySubscriptionCache implements SubscriptionCache {
     private final Map<String, Subscription> subscriptions = new HashMap<>();
 
     @Override
-    public void addOrUpdateActiveSubscription(final String requestId, final Subscription subscription) {
-        log.info("[{}] Adding subscription {}", requestId, subscription);
+    public void addOrUpdateActiveSubscription(final Subscription subscription) {
+        log.info("Adding subscription {}", subscription);
         subscriptions.put(subscription.userId(), subscription);
     }
 
     @Override
-    public Optional<Subscription> getActiveSubscription(final String requestId, final String userId) {
-        log.info("[{}] Getting subscriptions for {}", requestId, userId);
+    public Optional<Subscription> getActiveSubscription(final String userId) {
+        log.info("Getting subscriptions for {}", userId);
         return Optional.ofNullable(subscriptions.get(userId));
     }
 
     @Override
-    public Optional<SubscriptionPack> getSubscriptionPack(final String requestId, final String packId) {
-        log.info("[{}] Getting subscription pack for {}", requestId, packId);
+    public Optional<SubscriptionPack> getSubscriptionPack(final String packId) {
+        log.info("Getting subscription pack for {}", packId);
         return Optional.empty();
     }
 

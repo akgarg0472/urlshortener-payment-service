@@ -47,7 +47,9 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleException(final Exception e) {
-        log.error("Exception occurred", e);
+        if (log.isDebugEnabled()) {
+            log.error("Handling exception", e);
+        }
 
         final var paymentFailureResponse = switch (e.getClass().getSimpleName()) {
             case "HttpRequestMethodNotSupportedException" -> new ApiErrorResponse(405, "Method not allowed", null);

@@ -3,6 +3,7 @@ package com.akgarg.paymentservice.v1.subscription;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.logging.log4j.ThreadContext;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.env.Environment;
@@ -13,11 +14,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+import static com.akgarg.paymentservice.utils.PaymentServiceUtils.REQUEST_ID_THREAD_CONTEXT_KEY;
+
 @Slf4j
 @Service
 @Profile("prod")
 @RequiredArgsConstructor
-@SuppressWarnings("DuplicatedCode")
+@SuppressWarnings({"DuplicatedCode", "LoggingSimilarMessage"})
 public class SubscriptionService {
 
     private static final String REQUEST_ID_HEADER = "X-Request-ID";
@@ -56,7 +59,9 @@ public class SubscriptionService {
                                 .queryParam("page", 0)
                                 .queryParam("limit", 1000)
                                 .build();
-                        log.info("Subscription endpoint for subscription packs: {}", uri);
+                        if (log.isDebugEnabled()) {
+                            log.debug("Subscription endpoint for subscription packs: {}", uri);
+                        }
                         return uri;
                     })
                     .header(REQUEST_ID_HEADER, requestIdHeader)
@@ -72,13 +77,13 @@ public class SubscriptionService {
         return Collections.emptyList();
     }
 
-    Optional<Subscription> getActiveSubscriptionForUser(final String requestId, final String userId) {
-        log.info("[{}] Getting active subscription for user {}", requestId, userId);
+    Optional<Subscription> getActiveSubscriptionForUser(final String userId) {
+        log.info("Getting active subscription for userId {}", userId);
 
         final var subsServiceInstances = discoveryClient.getInstances(SUBSCRIPTION_SERVICE_NAME);
 
         if (subsServiceInstances.isEmpty()) {
-            log.warn("[{}] No subscription service instances found", requestId);
+            log.warn("No subscription service instance(s) found");
         }
 
         for (final var instance : subsServiceInstances) {
@@ -94,10 +99,12 @@ public class SubscriptionService {
                                 .path(ACTIVE_SUBSCRIPTION_ENDPOINT)
                                 .queryParam("userId", userId)
                                 .build();
-                        log.info("[{}] Subscription endpoint for active subscription: {}", requestId, uri);
+                        if (log.isDebugEnabled()) {
+                            log.debug("Subscription endpoint for active subscription: {}", uri);
+                        }
                         return uri;
                     })
-                    .header(REQUEST_ID_HEADER, requestId)
+                    .header(REQUEST_ID_HEADER, ThreadContext.get(REQUEST_ID_THREAD_CONTEXT_KEY))
                     .header(USER_ID_HEADER, userId)
                     .retrieve()
                     .toEntity(ActiveSubscriptionResponse.class)
@@ -111,13 +118,13 @@ public class SubscriptionService {
         return Optional.empty();
     }
 
-    public Optional<SubscriptionPack> getSubscriptionPack(final String requestId, final String packId) {
-        log.info("[{}] Getting subscription pack: {}", requestId, packId);
+    public Optional<SubscriptionPack> getSubscriptionPack(final String packId) {
+        log.info("Getting subscription pack for packId {}", packId);
 
         final var instances = discoveryClient.getInstances(SUBSCRIPTION_SERVICE_NAME);
 
         if (instances.isEmpty()) {
-            log.warn("[{}] No subscription service instances found", requestId);
+            log.warn("No subscription service instance(s) found");
         }
 
         for (final var instance : instances) {
@@ -132,15 +139,19 @@ public class SubscriptionService {
                                 .path(SUBSCRIPTION_PACKS_ENDPOINT.replaceAll("/+$", "") + "/")
                                 .path(packId)
                                 .build();
-                        log.info("[{}] Subscription endpoint for get pack: {}", requestId, uri);
+                        if (log.isDebugEnabled()) {
+                            log.debug("Subscription endpoint for get pack: {}", uri);
+                        }
                         return uri;
                     })
-                    .header(REQUEST_ID_HEADER, requestId)
+                    .header(REQUEST_ID_HEADER, ThreadContext.get(REQUEST_ID_THREAD_CONTEXT_KEY))
                     .retrieve()
                     .toEntity(SubscriptionPackResponse.class)
                     .getBody();
 
-            log.debug("[{}] Subscription pack response: {}", requestId, subscriptionPack);
+            if (log.isDebugEnabled()) {
+                log.debug("Subscription pack response: {}", subscriptionPack);
+            }
 
             if (subscriptionPack != null) {
                 return Optional.ofNullable(subscriptionPack.pack);

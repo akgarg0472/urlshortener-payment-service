@@ -18,18 +18,14 @@ import java.util.*;
 @Profile("dev")
 public class InMemoryDatabaseService implements DatabaseService {
 
-    private final Map<String, PaymentDetail> paymentDetails;
-
-    public InMemoryDatabaseService() {
-        paymentDetails = new HashMap<>();
-    }
+    private final Map<String, PaymentDetail> paymentDetails = new HashMap<>();
 
     @Override
-    public PaymentDetail savePaymentDetails(final String requestId, final PaymentDetail paymentDetail) {
-        log.info("[{}] Saving payment details: {}", requestId, paymentDetail);
+    public PaymentDetail savePaymentDetails(final PaymentDetail paymentDetail) {
+        log.info("Saving payment details: {}", paymentDetail);
 
         if (paymentDetails.containsKey(paymentDetail.getId())) {
-            throw new DatabaseException("Payment details already exists");
+            throw new DatabaseException("Payment details already exists for id %s".formatted(paymentDetail.getId()));
         }
 
         paymentDetails.put(paymentDetail.getId(), paymentDetail);
@@ -38,12 +34,12 @@ public class InMemoryDatabaseService implements DatabaseService {
     }
 
     @Override
-    public PaymentDetail updatePaymentDetails(final String requestId, final PaymentDetail paymentDetail) {
-        log.info("[{}] Updating payment details: {}", requestId, paymentDetail);
+    public PaymentDetail updatePaymentDetails(final PaymentDetail paymentDetail) {
+        log.info("Updating payment details: {}", paymentDetail);
 
         if (!paymentDetails.containsKey(paymentDetail.getId())) {
-            log.error("[{}] Payment detail with id {} not found", requestId, paymentDetail.getId());
-            throw new DatabaseException("Payment details not found with id: " + paymentDetail.getId());
+            log.error("Payment detail with id {} not found", paymentDetail.getId());
+            throw new DatabaseException("Payment details not found for payment id " + paymentDetail.getId());
         }
 
         paymentDetail.setUpdatedAt(System.currentTimeMillis());
@@ -52,14 +48,14 @@ public class InMemoryDatabaseService implements DatabaseService {
     }
 
     @Override
-    public Optional<PaymentDetail> getPaymentDetails(final String requestId, final String paymentId) {
-        log.info("[{}] Getting payment details for id: {}", requestId, paymentId);
+    public Optional<PaymentDetail> getPaymentDetails(final String paymentId) {
+        log.info("Getting payment details for id: {}", paymentId);
         return Optional.ofNullable(paymentDetails.get(paymentId));
     }
 
     @Override
-    public List<PaymentDetail> getPaymentDetailForUserByPaymentStatus(final String requestId, final String userId, final Collection<PaymentStatus> statuses) {
-        log.info("[{}] Getting payment details for user id {} for status: {}", requestId, userId, statuses);
+    public List<PaymentDetail> getPaymentDetailForUserByPaymentStatus(final String userId, final Collection<PaymentStatus> statuses) {
+        log.info("Getting payment details for user id {} with payment status {}", userId, statuses);
         return paymentDetails
                 .values()
                 .stream()
@@ -69,9 +65,8 @@ public class InMemoryDatabaseService implements DatabaseService {
     }
 
     @Override
-    public List<PaymentDetail> getAllPaymentDetails(final String requestId, final String userId) {
-        log.info("[{}] Getting payment details: {}", requestId, userId);
-
+    public List<PaymentDetail> getAllPaymentDetails(final String userId) {
+        log.info("Getting payment details for userId {}", userId);
         return paymentDetails
                 .values()
                 .stream()

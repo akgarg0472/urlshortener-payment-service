@@ -35,8 +35,8 @@ public class RedisSubscriptionCache implements SubscriptionCache {
     }
 
     @Override
-    public void addOrUpdateActiveSubscription(final String requestId, final Subscription subscription) {
-        log.info("[{}] Adding/updating subscription {}", requestId, subscription);
+    public void addOrUpdateActiveSubscription(final Subscription subscription) {
+        log.info("Adding/updating subscription {}", subscription);
         final var expirationTime = Long.parseLong(environment.getProperty("subscription.cache.expiration.active-plan", "3_00_000"));
 
         try {
@@ -45,14 +45,14 @@ public class RedisSubscriptionCache implements SubscriptionCache {
                     Math.min(expirationTime, subscription.expiresAt() - System.currentTimeMillis()),
                     TimeUnit.MILLISECONDS);
         } catch (Exception e) {
-            log.error("[{}] Error while adding/updating subscription {}", requestId, subscription, e);
+            log.error("Error adding/updating subscription", e);
         }
     }
 
     @Override
-    public Optional<Subscription> getActiveSubscription(final String requestId, final String userId) {
+    public Optional<Subscription> getActiveSubscription(final String userId) {
         Objects.requireNonNull(userId, "userId cannot be null");
-        log.info("[{}] Getting subscriptions for {}", requestId, userId);
+        log.info("Getting active subscription for userId {}", userId);
 
         try {
             final var subscriptionObject = redisTemplate.opsForValue().get(getActiveSubscriptionKey(userId));
@@ -61,39 +61,41 @@ public class RedisSubscriptionCache implements SubscriptionCache {
                 return Optional.ofNullable(objectMapper.readValue(subscriptionObject, Subscription.class));
             }
 
-            final var activeSubscription = subscriptionService.getActiveSubscriptionForUser(requestId, userId);
-            activeSubscription.ifPresent(sub -> addOrUpdateActiveSubscription(requestId, sub));
+            final var activeSubscription = subscriptionService.getActiveSubscriptionForUser(userId);
+            activeSubscription.ifPresent(this::addOrUpdateActiveSubscription);
             return activeSubscription;
         } catch (Exception e) {
-            log.error("[{}] Error while getting active subscription for {}", requestId, userId, e);
+            log.error("Error getting active subscription for userId {}", userId, e);
             throw new SubscriptionCacheException(e);
         }
     }
 
     @Override
-    public Optional<SubscriptionPack> getSubscriptionPack(final String requestId, final String packId) {
-        log.info("[{}] Getting subscription pack for {}", requestId, packId);
+    public Optional<SubscriptionPack> getSubscriptionPack(final String packId) {
+        log.info("Getting subscription pack for packId {}", packId);
 
         try {
             final var cachedPack = redisTemplate.opsForValue().get(getSubscriptionPackKey(packId));
             if (cachedPack != null) {
                 return Optional.ofNullable(objectMapper.readValue(cachedPack, SubscriptionPack.class));
             }
-            final var subscriptionPack = subscriptionService.getSubscriptionPack(requestId, packId);
+            final var subscriptionPack = subscriptionService.getSubscriptionPack(packId);
             if (subscriptionPack.isPresent()) {
                 addOrUpdateSubscriptionPack(subscriptionPack.get());
             }
             return subscriptionPack;
         } catch (Exception e) {
-            log.error("[{}] Error while getting subscription pack for {}", requestId, packId, e);
+            log.error("Error getting subscription pack for packId {}", packId, e);
             throw new SubscriptionCacheException(e);
         }
     }
 
     private void addOrUpdateSubscriptionPack(final SubscriptionPack pack) throws JsonProcessingException {
         log.info("Adding/updating subscription pack: {}", pack);
+
         final var expirationTime = Long.parseLong(environment.getProperty("subscription.cache.expiration.pack",
                 "4_32_00_000"));
+
         redisTemplate.opsForValue().set(getSubscriptionPackKey(pack.packId()),
                 objectMapper.writeValueAsString(pack),
                 expirationTime,

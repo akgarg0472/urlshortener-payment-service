@@ -3,15 +3,11 @@ package com.akgarg.paymentservice.payment;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import lombok.ToString;
 
-/**
- * @author Akhilesh Garg
- * @since 11/11/23
- */
+import static com.akgarg.paymentservice.utils.PaymentServiceUtils.maskString;
+
 @Getter
 @Setter
-@ToString
 @Entity
 @Table(name = "payment_detail", indexes = {
         @Index(name = "idx_payment_detail_user_id", columnList = "user_id")
@@ -59,5 +55,25 @@ public final class PaymentDetail {
 
     @Column(name = "is_deleted")
     private boolean deleted = false;
+
+    @Override
+    public String toString() {
+        return "{" +
+                "id='" + maskString(id) + '\'' +
+                ", userId='" + maskString(userId) + '\'' +
+                ", email='" + maskString(email) + '\'' +
+                ", name='" + maskString(name) + '\'' +
+                ", packId='" + maskString(packId) + '\'' +
+                ", amount=" + amount +
+                ", paymentStatus='" + paymentStatus + '\'' +
+                ", paymentGateway='" + paymentGateway + '\'' +
+                ", currency='" + currency + '\'' +
+                ", paymentMethod='" + paymentMethod + '\'' +
+                ", createdAt=" + createdAt +
+                ", updatedAt=" + updatedAt +
+                ", completedAt=" + completedAt +
+                ", deleted=" + deleted +
+                '}';
+    }
 
 }

@@ -4,10 +4,10 @@ import java.util.Optional;
 
 public interface SubscriptionCache {
 
-    void addOrUpdateActiveSubscription(String requestId, Subscription subscription);
+    void addOrUpdateActiveSubscription(Subscription subscription);
 
-    Optional<Subscription> getActiveSubscription(String requestId, String userId);
+    Optional<Subscription> getActiveSubscription(String userId);
 
-    Optional<SubscriptionPack> getSubscriptionPack(String requestId, String packId);
+    Optional<SubscriptionPack> getSubscriptionPack(String packId);
 
 }

@@ -4,8 +4,7 @@ import com.akgarg.paymentservice.eventpublisher.PaymentEvent;
 import com.akgarg.paymentservice.eventpublisher.PaymentEventPublisher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -13,12 +12,11 @@ import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
+@Slf4j
+@Component
 @Profile("prod")
 @RequiredArgsConstructor
-@Component
 public class KafkaPaymentEventPublisher implements PaymentEventPublisher {
-
-    private static final Logger LOGGER = LogManager.getLogger(KafkaPaymentEventPublisher.class);
 
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
@@ -27,14 +25,18 @@ public class KafkaPaymentEventPublisher implements PaymentEventPublisher {
     private String paymentTopicName;
 
     @Override
-    public void publish(final PaymentEvent paymentEvent) {
+    public void publishPaymentSuccess(final PaymentEvent paymentEvent) {
+        log.info("Publishing payment success event: {}", paymentEvent);
+
         serializeEvent(paymentEvent)
                 .ifPresent(eventJson -> kafkaTemplate.send(paymentTopicName, eventJson)
                         .whenComplete((result, throwable) -> {
                             if (throwable != null) {
-                                LOGGER.error(throwable.getMessage(), throwable);
+                                log.error("Failed to send payment success event", throwable);
                             } else {
-                                LOGGER.debug("Kafka event successfully published: {}", result);
+                                if (log.isDebugEnabled()) {
+                                    log.debug("Kafka event successfully published: {}", result);
+                                }
                             }
                         })
                 );
@@ -44,7 +46,7 @@ public class KafkaPaymentEventPublisher implements PaymentEventPublisher {
         try {
             return Optional.of(objectMapper.writeValueAsString(paymentEvent));
         } catch (Exception e) {
-            LOGGER.error("Error occurred while serializing payment event", e);
+            log.error("Error serializing payment success event", e);
             return Optional.empty();
         }
     }

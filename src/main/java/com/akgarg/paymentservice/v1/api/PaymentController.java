@@ -7,28 +7,25 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import static com.akgarg.paymentservice.utils.PaymentServiceUtils.USER_ID_HEADER;
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/payments")
 public class PaymentController {
 
-    private static final String REQUEST_ID_HEADER = "X-Request-ID";
-    private static final String USER_ID_HEADER = "X-User-ID";
-
     private final PaymentService paymentService;
 
     @GetMapping("/{paymentId}")
     public ResponseEntity<PaymentDetailResponse> findPaymentById(
-            @RequestHeader(REQUEST_ID_HEADER) final String requestId,
             @RequestHeader(USER_ID_HEADER) final String userId,
             @PathVariable("paymentId") final String paymentId) {
-        final var response = paymentService.getPaymentDetailById(requestId, userId, paymentId);
+        final var response = paymentService.getPaymentDetailById(userId, paymentId);
         return ResponseEntity.status(response.getStatusCode()).body(response);
     }
 
     @GetMapping("/history")
     public ResponseEntity<PaymentHistoryResponse> getAllPaymentDetails(
-            @RequestHeader(REQUEST_ID_HEADER) final String requestId,
             @RequestHeader(USER_ID_HEADER) final String userIdFromHeader,
             @RequestParam("userId") final String userId
     ) {
@@ -36,12 +33,12 @@ public class PaymentController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(PaymentHistoryResponse.builder()
                             .payments(null)
-                            .message("User is not authorized to view payment history")
+                            .message("You're not authorized to view payment history for some other user")
                             .statusCode(HttpStatus.FORBIDDEN.value())
                             .build());
         }
 
-        final var response = paymentService.getPaymentHistory(requestId, userId);
+        final var response = paymentService.getPaymentHistory(userId);
         return ResponseEntity.status(response.getStatusCode()).body(response);
     }
 

@@ -6,13 +6,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-@Profile("dev")
-@Component
 @Slf4j
+@Component
+@Profile("dev")
 public class VoidPaymentEventPublisher implements PaymentEventPublisher {
 
     @Override
-    public void publish(final PaymentEvent paymentEvent) {
+    public void publishPaymentSuccess(final PaymentEvent paymentEvent) {
         log.info("Publishing payment event {}", paymentEvent);
     }
 

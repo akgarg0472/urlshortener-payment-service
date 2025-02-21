@@ -2,6 +2,6 @@ package com.akgarg.paymentservice.eventpublisher;
 
 public interface PaymentEventPublisher {
 
-    void publish(PaymentEvent paymentEvent);
+    void publishPaymentSuccess(PaymentEvent paymentEvent);
 
 }
