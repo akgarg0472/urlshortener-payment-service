@@ -59,8 +59,8 @@ public class SubscriptionService {
                                 .queryParam("page", 0)
                                 .queryParam("limit", 1000)
                                 .build();
-                        if (log.isDebugEnabled()) {
-                            log.debug("Subscription endpoint for subscription packs: {}", uri);
+                        if (log.isInfoEnabled()) {
+                            log.info("Subscription endpoint for subscription packs: {}", uri);
                         }
                         return uri;
                     })
@@ -99,8 +99,8 @@ public class SubscriptionService {
                                 .path(ACTIVE_SUBSCRIPTION_ENDPOINT)
                                 .queryParam("userId", userId)
                                 .build();
-                        if (log.isDebugEnabled()) {
-                            log.debug("Subscription endpoint for active subscription: {}", uri);
+                        if (log.isInfoEnabled()) {
+                            log.info("Subscription endpoint for active subscription: {}", uri);
                         }
                         return uri;
                     })
@@ -139,8 +139,8 @@ public class SubscriptionService {
                                 .path(SUBSCRIPTION_PACKS_ENDPOINT.replaceAll("/+$", "") + "/")
                                 .path(packId)
                                 .build();
-                        if (log.isDebugEnabled()) {
-                            log.debug("Subscription endpoint for get pack: {}", uri);
+                        if (log.isInfoEnabled()) {
+                            log.info("Subscription endpoint for get pack: {}", uri);
                         }
                         return uri;
                     })

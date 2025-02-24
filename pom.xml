@@ -13,7 +13,7 @@
 
     <groupId>com.akgarg</groupId>
     <artifactId>UrlShortenerPaymentService</artifactId>
-    <version>1.7.2</version>
+    <version>1.7.3</version>
     <name>Payment Service</name>
     <description>Payment service for UrlShortener</description>
 
