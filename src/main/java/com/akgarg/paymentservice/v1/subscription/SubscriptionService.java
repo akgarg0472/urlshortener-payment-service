@@ -52,7 +52,7 @@ public class SubscriptionService {
                     .get()
                     .uri(uriBuilder -> {
                         final var uri = uriBuilder
-                                .scheme(instanceUri.getScheme())
+                                .scheme((instanceUri.getScheme() != null) ? instanceUri.getScheme() : "http")
                                 .host(instanceUri.getHost())
                                 .port(instanceUri.getPort())
                                 .path(SUBSCRIPTION_PACKS_ENDPOINT)
@@ -93,7 +93,7 @@ public class SubscriptionService {
                     .get()
                     .uri(uriBuilder -> {
                         final var uri = uriBuilder
-                                .scheme(instanceUri.getScheme())
+                                .scheme((instanceUri.getScheme() != null) ? instanceUri.getScheme() : "http")
                                 .host(instanceUri.getHost())
                                 .port(instanceUri.getPort())
                                 .path(ACTIVE_SUBSCRIPTION_ENDPOINT)
@@ -133,7 +133,8 @@ public class SubscriptionService {
             final var subscriptionPack = restClientBuilder.build()
                     .get()
                     .uri(uriBuilder -> {
-                        final var uri = uriBuilder.scheme(instance.getScheme())
+                        final var uri = uriBuilder
+                                .scheme((instanceUri.getScheme() != null) ? instanceUri.getScheme() : "http")
                                 .host(instanceUri.getHost())
                                 .port(instanceUri.getPort())
                                 .path(SUBSCRIPTION_PACKS_ENDPOINT.replaceAll("/+$", "") + "/")
