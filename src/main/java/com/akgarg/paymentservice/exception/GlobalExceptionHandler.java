@@ -47,8 +47,8 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleException(final Exception e) {
-        if (log.isDebugEnabled()) {
-            log.error("Handling exception", e);
+        if (log.isErrorEnabled()) {
+            log.error("Exception occurred: {}", e.getMessage(), e);
         }
 
         final var paymentFailureResponse = switch (e.getClass().getSimpleName()) {
